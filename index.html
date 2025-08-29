@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Media Flight Planning App</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useMemo } = React;
+
+        const MediaFlightPlanner = () => {
+            // Tactic data
+            const tacticData = [
+                { category: "Email Marketing", product: "Email Marketing", subProduct: "1:1 Marketing", rate: "$24.00", kpi: "CPM" },
+                { category: "Email Marketing", product: "Email Marketing", subProduct: "B2B (Business Targeting)", rate: "$24.00", kpi: "CPM" },
+                { category: "Email Marketing", product: "Email Marketing", subProduct: "B2C (Consumer Targeting)", rate: "$30.00", kpi: "CPM" },
+                { category: "Programmatic", product: "Programmatic Audio", subProduct: "AAT", rate: "$25.00", kpi: "CPM" },
+                { category: "Programmatic", product: "Programmatic Audio", subProduct: "RON", rate: "$25.00", kpi: "CPM" },
+                { category: "Programmatic", product: "Addressable Solutions", subProduct: "CTV", rate: "$35.00", kpi: "CPM" },
+                { category: "Programmatic", product: "Addressable Solutions", subProduct: "Local CTV", rate: "$35.00", kpi: "CPM" },
+                { category: "Programmatic", product: "Blended Tactics", subProduct: "Standard", rate: "$15.00", kpi: "CPM" },
+                { category: "Programmatic", product: "STV", subProduct: "Local", rate: "$35.00", kpi: "CPM" },
+                { category: "Programmatic", product: "YouTube", subProduct: "TrueView", rate: "$0.05", kpi: "CPV" },
+                { category: "Programmatic", product: "YouTube", subProduct: "Bumper", rate: "$15.00", kpi: "CPM" },
+                { category: "Programmatic", product: "YouTube", subProduct: "Shorts", rate: "$12.00", kpi: "CPM" },
+                { category: "Social", product: "Meta", subProduct: "Facebook", rate: "$8.00", kpi: "CPM" },
+                { category: "Social", product: "Meta", subProduct: "Instagram", rate: "$10.00", kpi: "CPM" },
+                { category: "Social", product: "Snapchat", subProduct: "Standard", rate: "$12.00", kpi: "CPM" },
+                { category: "Social", product: "TikTok", subProduct: "Standard", rate: "$15.00", kpi: "CPM" },
+                { category: "Social", product: "Twitter", subProduct: "Standard", rate: "$8.00", kpi: "CPM" },
+                { category: "Social", product: "Pinterest", subProduct: "Standard", rate: "$10.00", kpi: "CPM" },
+                { category: "Social", product: "LinkedIn", subProduct: "Standard", rate: "$18.00", kpi: "CPM" },
+                { category: "Google", product: "SEM", subProduct: "Search", rate: "$2.50", kpi: "CPLC" },
+                { category: "Google", product: "SEM", subProduct: "Display", rate: "$8.00", kpi: "CPM" },
+                { category: "Google", product: "Spark", subProduct: "Standard", rate: "$12.00", kpi: "CPM" },
+                { category: "Local Display", product: "CPM Display", subProduct: "Standard", rate: "$8.00", kpi: "CPM" },
+                { category: "Local Display", product: "Takeovers", subProduct: "Homepage", rate: "$25.00", kpi: "CPM" },
+                { category: "Local Display", product: "Sponsorship", subProduct: "Standard", rate: "$15.00", kpi: "CPM" }
+            ];
+
+            // State management
+            const [activeTab, setActiveTab] = useState(0);
+            const [campaigns, setCampaigns] = useState([]);
+            const [showForm, setShowForm] = useState(true);
+            const [showDetailedView, setShowDetailedView] = useState(null);
+            const [validationAlert, setValidationAlert] = useState(null);
+            
+            // Form state
+            const [formData, setFormData] = useState({
+                tactic: '',
+                startDate: '',
+                endDate: '',
+                totalBudget: '',
+                totalImpressions: '',
+                totalViews: '',
+                rate: '',
+                metricType: 'CPM'
+            });
+            
+            const [searchTerm, setSearchTerm] = useState('');
+            const [showTacticDropdown, setShowTacticDropdown] = useState(false);
+            const [validationErrors, setValidationErrors] = useState({});
+
+            // Format date to MM/DD/YYYY
+            const formatDate = (dateString) => {
+                const date = new Date(dateString);
+                return date.toLocaleDateString('en-US');
+            };
+
+            // Graceful rounding function
+            const gracefulRound = (value) => {
+                if (!value || isNaN(value)) return 0;
+                return Math.round(parseFloat(value));
+            };
+
+            // Filter tactics based on search
+            const filteredTactics = useMemo(() => {
+                return tacticData.filter(tactic => 
+                    `${tactic.product} - ${tactic.subProduct}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    tactic.category.toLowerCase().includes(searchTerm.toLowerCase())
+                );
+            }, [searchTerm]);
+
+            // Get template type based on selected tactic
+            const getTemplateType = (tacticString) => {
+                if (!tacticString) return null;
+                
+                const selectedTactic = tacticData.find(t => 
+                    `${t.product} - ${t.subProduct}` === tacticString
+                );
+                
+                if (!selectedTactic) return null;
+                
+                if (selectedTactic.product === 'YouTube') return 'youtube';
+                if (selectedTactic.category === 'Google' || selectedTactic.category === 'Social') return 'sem-social';
+                return 'programmatic';
+            };
+
+            // Real-time calculation handlers
+            const handleBudgetChange = (value) => {
+                const budget = parseFloat(value) || 0;
+                const rate = parseFloat(formData.rate) || 0;
+                
+                if (rate > 0) {
+                    let calculatedValue = 0;
+                    if (formData.metricType === 'CPM') {
+                        calculatedValue = Math.round((budget * 1000) / rate);
+                        setFormData(prev => ({ 
+                            ...prev, 
+                            totalBudget: value,
+                            totalImpressions: calculatedValue.toString()
+                        }));
+                    } else if (formData.metricType === 'CPV') {
+                        calculatedValue = Math.round(budget / rate);
+                        setFormData(prev => ({ 
+                            ...prev, 
+                            totalBudget: value,
+                            totalViews: calculatedValue.toString()
+                        }));
+                    }
+                } else {
+                    setFormData(prev => ({ ...prev, totalBudget: value }));
+                }
+            };
+
+            const handleImpressionsChange = (value) => {
+                const impressions = parseFloat(value) || 0;
+                const rate = parseFloat(formData.rate) || 0;
+                
+                if (rate > 0 && formData.metricType === 'CPM') {
+                    const calculatedBudget = ((impressions * rate) / 1000).toFixed(2);
+                    setFormData(prev => ({ 
+                        ...prev, 
+                        totalImpressions: value,
+                        totalBudget: calculatedBudget
+                    }));
+                } else {
+                    setFormData(prev => ({ ...prev, totalImpressions: value }));
+                }
+            };
+
+            const handleViewsChange = (value) => {
+                const views = parseFloat(value) || 0;
+                const rate = parseFloat(formData.rate) || 0;
+                
+                if (rate > 0 && formData.metricType === 'CPV') {
+                    const calculatedBudget = (views * rate).toFixed(2);
+                    setFormData(prev => ({ 
+                        ...prev, 
+                        totalViews: value,
+                        totalBudget: calculatedBudget
+                    }));
+                } else {
+                    setFormData(prev => ({ ...prev, totalViews: value }));
+                }
+            };
+
+            const handleRateChange = (value) => {
+                setFormData(prev => ({ ...prev, rate: value }));
+                
+                if (formData.totalBudget) {
+                    handleBudgetChange(formData.totalBudget);
+                }
+            };
+
+            // Handle tactic selection
+            const handleTacticSelect = (tactic) => {
+                const tacticString = `${tactic.product} - ${tactic.subProduct}`;
+                const rate = parseFloat(tactic.rate.replace('$', ''));
+                
+                setFormData(prev => ({
+                    ...prev,
+                    tactic: tacticString,
+                    metricType: tactic.kpi,
+                    rate: rate
+                }));
+                
+                setSearchTerm(tacticString);
+                setShowTacticDropdown(false);
+            };
+
+            // Calculate months between dates
+            const getMonthsBetween = (startDate, endDate) => {
+                const start = new Date(startDate);
+                const end = new Date(endDate);
+                const months = [];
+                
+                const current = new Date(start.getFullYear(), start.getMonth(), 1);
+                const lastMonth = new Date(end.getFullYear(), end.getMonth(), 1);
+                
+                while (current <= lastMonth) {
+                    months.push(new Date(current));
+                    current.setMonth(current.getMonth() + 1);
+                }
+                
+                return months;
+            };
+
+            // Validation function
+            const validateInputs = () => {
+                const errors = {};
+                
+                if (!formData.tactic) errors.tactic = 'Please select a tactic';
+                if (!formData.startDate) errors.startDate = 'Start date is required';
+                if (!formData.endDate) errors.endDate = 'End date is required';
+                if (!formData.totalBudget) errors.totalBudget = 'Total budget is required';
+                if (!formData.rate) errors.rate = 'Rate is required';
+                
+                if (formData.startDate && formData.endDate && new Date(formData.startDate) >= new Date(formData.endDate)) {
+                    errors.endDate = 'End date must be after start date';
+                }
+                
+                if (formData.tactic && formData.metricType === 'CPV' && !formData.totalViews) {
+                    errors.totalViews = 'Total views required';
+                } else if (formData.tactic && formData.metricType === 'CPM' && !formData.totalImpressions) {
+                    errors.totalImpressions = 'Total impressions required';
+                }
+                
+                return errors;
+            };
+
+            // Generate flight data
+            const generateFlightData = (proceedAnyway = false) => {
+                const errors = validateInputs();
+                
+                if (Object.keys(errors).length > 0 && !proceedAnyway) {
+                    setValidationErrors(errors);
+                    setValidationAlert({
+                        type: 'error',
+                        message: 'Please fix the validation errors or proceed anyway.',
+                        showProceed: true
+                    });
+                    return;
+                }
+                
+                setValidationErrors({});
+                setValidationAlert(null);
+                
+                const months = getMonthsBetween(formData.startDate, formData.endDate);
+                const budgetPerMonth = parseFloat(formData.totalBudget) / months.length;
+                
+                const flightData = months.map((month, index) => {
+                    const startDate = new Date(month.getFullYear(), month.getMonth(), 1);
+                    const endDate = new Date(month.getFullYear(), month.getMonth() + 1, 0);
+                    
+                    const flight = {
+                        id: Date.now() + index,
+                        line: index + 1,
+                        startDate: startDate.toISOString().split('T')[0],
+                        endDate: endDate.toISOString().split('T')[0],
+                        budget: budgetPerMonth
+                    };
+                    
+                    const templateType = getTemplateType(formData.tactic);
+                    
+                    if (templateType === 'programmatic') {
+                        const impressionsPerMonth = gracefulRound(parseFloat(formData.totalImpressions) / months.length);
+                        flight.impressions = impressionsPerMonth;
+                        flight.trafficBudget = budgetPerMonth * 1.01;
+                        flight.trafficImpressions = gracefulRound((flight.trafficBudget / parseFloat(formData.rate)) * 1000);
+                    } else if (templateType === 'youtube') {
+                        const viewsPerMonth = gracefulRound(parseFloat(formData.totalViews || formData.totalImpressions) / months.length);
+                        const daysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+                        
+                        flight.totalViews = viewsPerMonth;
+                        flight.daysInFlight = daysInMonth;
+                        flight.dailyViews = Math.round((viewsPerMonth / daysInMonth) * 100) / 100;
+                        
+                        if (formData.metricType === 'CPV') {
+                            flight.dailyPlatformBudget = flight.dailyViews * parseFloat(formData.rate);
+                            flight.totalRetail = viewsPerMonth * parseFloat(formData.rate);
+                        } else {
+                            flight.dailyPlatformBudget = flight.dailyViews * (parseFloat(formData.rate) / 1000);
+                            flight.totalRetail = viewsPerMonth * (parseFloat(formData.rate) / 1000);
+                        }
+                    }
+                    
+                    return flight;
+                });
+                
+                const newCampaign = {
+                    id: Date.now(),
+                    name: formData.tactic,
+                    templateType: getTemplateType(formData.tactic),
+                    flights: flightData,
+                    formData: { ...formData },
+                    originalFlights: JSON.parse(JSON.stringify(flightData))
+                };
+                
+                setCampaigns(prev => [...prev, newCampaign]);
+                setActiveTab(campaigns.length);
+                setShowForm(false);
+            };
+
+            // Update flight data
+            const updateFlight = (campaignIndex, flightId, field, value) => {
+                setCampaigns(prev => {
+                    const updated = [...prev];
+                    const campaign = updated[campaignIndex];
+                    const flightIndex = campaign.flights.findIndex(f => f.id === flightId);
+                    
+                    if (flightIndex !== -1) {
+                        campaign.flights[flightIndex][field] = parseFloat(value) || 0;
+                        
+                        if (field === 'budget' && campaign.templateType === 'programmatic') {
+                            const flight = campaign.flights[flightIndex];
+                            flight.trafficBudget = flight.budget * 1.01;
+                            flight.trafficImpressions = gracefulRound((flight.trafficBudget / parseFloat(campaign.formData.rate)) * 1000);
+                        }
+                    }
+                    
+                    return updated;
+                });
+            };
+
+            // Delete flight
+            const deleteFlight = (campaignIndex, flightId) => {
+                setCampaigns(prev => {
+                    const updated = [...prev];
+                    const campaign = updated[campaignIndex];
+                    campaign.flights = campaign.flights.filter(f => f.id !== flightId);
+                    
+                    campaign.flights.forEach((flight, index) => {
+                        flight.line = index + 1;
+                    });
+                    
+                    return updated;
+                });
+            };
+
+            // Zero out flight budget and redistribute
+            const zeroOutFlight = (campaignIndex, flightId) => {
+                setCampaigns(prev => {
+                    const updated = [...prev];
+                    const campaign = updated[campaignIndex];
+                    const flightIndex = campaign.flights.findIndex(f => f.id === flightId);
+                    
+                    if (flightIndex !== -1) {
+                        const zeroBudget = campaign.flights[flightIndex].budget;
+                        campaign.flights[flightIndex].budget = 0;
+                        
+                        const otherFlights = campaign.flights.filter((_, i) => i !== flightIndex && campaign.flights[i].budget > 0);
+                        if (otherFlights.length > 0) {
+                            const redistributeAmount = zeroBudget / otherFlights.length;
+                            otherFlights.forEach(flight => {
+                                flight.budget += redistributeAmount;
+                                
+                                if (campaign.templateType === 'programmatic') {
+                                    flight.trafficBudget = flight.budget * 1.01;
+                                    flight.trafficImpressions = gracefulRound((flight.trafficBudget / parseFloat(campaign.formData.rate)) * 1000);
+                                }
+                            });
+                        }
+                    }
+                    
+                    return updated;
+                });
+            };
+
+            // Export to CSV
+            const exportToCSV = (campaign) => {
+                const headers = ['Line', 'Start Date', 'End Date', 'Budget'];
+                
+                if (campaign.templateType === 'programmatic') {
+                    headers.push('Impressions', 'Traffic Budget', 'Traffic Impressions');
+                } else if (campaign.templateType === 'youtube') {
+                    headers.push('Total Views', 'Days in Flight', 'Daily Views', 'Daily Platform Budget', 'Total Retail');
+                }
+                
+                const csvContent = [
+                    headers.join(','),
+                    ...campaign.flights.map(flight => {
+                        const row = [flight.line, formatDate(flight.startDate), formatDate(flight.endDate), flight.budget.toFixed(2)];
+                        
+                        if (campaign.templateType === 'programmatic') {
+                            row.push(
+                                flight.impressions?.toLocaleString() || '',
+                                flight.trafficBudget?.toFixed(2) || '',
+                                flight.trafficImpressions?.toLocaleString() || ''
+                            );
+                        } else if (campaign.templateType === 'youtube') {
+                            row.push(
+                                flight.totalViews?.toLocaleString() || '',
+                                flight.daysInFlight || '',
+                                flight.dailyViews?.toFixed(2) || '',
+                                flight.dailyPlatformBudget?.toFixed(2) || '',
+                                flight.totalRetail?.toFixed(2) || ''
+                            );
+                        }
+                        
+                        return row.join(',');
+                    })
+                ].join('\n');
+                
+                const blob = new Blob([csvContent], { type: 'text/csv' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${campaign.name.replace(/[^a-z0-9]/gi, '_')}_flight_plan.csv`;
+                a.click();
+                URL.revokeObjectURL(url);
+            };
+
+            // Calculate totals for table footer
+            const calculateTotals = (flights, templateType) => {
+                const totals = {
+                    budget: flights.reduce((sum, flight) => sum + flight.budget, 0)
+                };
+                
+                if (templateType === 'programmatic') {
+                    totals.impressions = gracefulRound(flights.reduce((sum, flight) => sum + (flight.impressions || 0), 0));
+                    totals.trafficBudget = flights.reduce((sum, flight) => sum + (flight.trafficBudget || 0), 0);
+                    totals.trafficImpressions = gracefulRound(flights.reduce((sum, flight) => sum + (flight.trafficImpressions || 0), 0));
+                } else if (templateType === 'youtube') {
+                    totals.totalViews = gracefulRound(flights.reduce((sum, flight) => sum + (flight.totalViews || 0), 0));
+                    totals.totalRetail = flights.reduce((sum, flight) => sum + (flight.totalRetail || 0), 0);
+                }
+                
+                return totals;
+            };
+
+            // Render table based on template type
+            const renderTable = (campaign, campaignIndex) => {
+                const totals = calculateTotals(campaign.flights, campaign.templateType);
+                
+                if (campaign.templateType === 'sem-social') {
+                    return React.createElement('div', { className: "overflow-x-auto" },
+                        React.createElement('table', { className: "w-full border-collapse" },
+                            React.createElement('thead', null,
+                                React.createElement('tr', { className: "bg-gray-50" },
+                                    React.createElement('th', { className: "border border-gray-200 px-4 py-3 text-left text-sm font-medium text-gray-900" }, "Line"),
+                                    React.createElement('th', { className: "border border-gray-200 px-4 py-3 text-left text-sm font-medium text-gray-900" }, "Start Date"),
+                                    React.createElement('th', { className: "border border-gray-200 px-4 py-3 text-left text-sm font-medium text-gray-900" }, "End Date"),
+                                    React.createElement('th', { className: "border border-gray-200 px-4 py-3 text-left text-sm font-medium text-gray-900" }, "Budget"),
+                                    React.createElement('th', { className: "border border-gray-200 px-4 py-3 text-left text-sm font-medium text-gray-900" }, "Actions")
+                                )
+                            ),
+                            React.createElement('tbody', null,
+                                campaign.flights.map((flight) =>
+                                    React.createElement('tr', { key: flight.id, className: "hover:bg-gray-50" },
+                                        React.createElement('td', { className: "border border-gray-200 px-4 py-3 text-sm text-gray-900" }, flight.line),
+                                        React.createElement('td', { className: "border border-gray-200 px-4 py-3 text-sm text-gray-900" }, formatDate(flight.startDate)),
+                                        React.createElement('td', { className: "border border-gray-200 px-4 py-3 text-sm text-gray-900" }, formatDate(flight.endDate)),
+                                        React.createElement('td', { className: "border border-gray-200 px-4 py-3" },
+                                            React.createElement('input', {
+                                                type: "number",
+                                                value: flight.budget.toFixed(2),
+                                                onChange: (e) => updateFlight(campaignIndex, flight.id, 'budget', e.target.value),
+                                                className: "w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent",
+                                                step: "0.01"
+                                            })
+                                        ),
+                                        React.createElement('td', { className: "border border-gray-200 px-4 py-3" },
+                                            React.createElement('div', { className: "flex space-x-2" },
+                                                React.createElement('button', {
+                                                    onClick: () => setShowDetailedView({ campaignIndex, flight }),
+                                                    className: "text-blue-600 hover:text-blue-800 px-2 py-1 text-xs border rounded",
+                                                    title: "View Details"
+                                                }, "View"),
+                                                React.createElement('button', {
+                                                    onClick: () => zeroOutFlight(campaignIndex, flight.id),
+                                                    className: "text-yellow-600 hover:text-yellow-800 px-2 py-1 text-xs border rounded",
+                                                    title: "Zero Budget"
+                                                }, "Zero"),
+                                                React.createElement('button', {
+                                                    onClick: () => deleteFlight(campaignIndex, flight.id),
+                                                    className: "text-red-600 hover:text-red-800 px-2 py-1 text-xs border rounded",
+                                                    title: "Delete"
+                                                }, "Delete")
+                                            )
+                                        )
+                                    )
+                                ),
+                                React.createElement('tr', { className: "bg-blue-50 font-semibold" },
+                                    React.createElement('td', { className: "border border-gray-200 px-4 py-3 text-sm text-gray-900" }, "Total"),
+                                    React.createElement('td', { className: "border border-gray-200 px-4 py-3" }),
+                                    React.createElement('td', { className: "border border-gray-200 px-4 py-3" }),
+                                    React.createElement('td', { className: "border border-gray-200 px-4 py-3 text-sm text-gray-900" }, `$${totals.budget.toFixed(2)}`),
+                                    React.createElement('td', { className: "border border-gray-200 px-4 py-3" })
+                                )
+                            )
+                        )
+                    );
+                } else if (campaign.templateType === 'programmatic') {
+                    return React.createElement('div', { className: "overflow-x-auto" },
+                        React.createElement('table', { className: "w-full border-collapse" },
+                            React.createElement('thead', null,
+                                React.createElement('tr', { className: "bg-gray-50" },
+                                    React.createElement('th', { className: "border border-gray-200 px-4 py-3 text-left text-sm font-medium text-gray-900" }, "Line"),
+                                    React.createElement('th', { className: "border border-gray-200 px-4 py-3 text-left text-sm font-medium text-gray-900" }, "Start Date"),
+                                    React.createElement('th', { className: "border border-gray-200 px-4 py-3 text-left text-sm font-medium text-gray-900" }, "End Date"),
+                                    React.createElement('th', { className: "border border-gray-200 px-4 py-3 text-left text-sm font-medium text-gray-900" }, "Budget"),
+                                    React.createElement('th', { className: "border border-gray-200 px-4 py-3 text-left text-sm font-medium text-gray-900" }, "Impressions"),
+                                    React.createElement('th', { className: "border border-gray-200 px-4 py-3 text-left text-sm font-medium text-gray-900" }, "Traffic Budget"),
+                                    React.createElement('th', { className: "border border-gray-200 px-4 py-3 text-left text-sm font-medium text-gray-900" }, "Traffic Impressions"),
+                                    React.createElement('th', { className: "border border-gray-200 px-4 py-3 text-left text-sm font-medium text-gray-900" }, "Actions")
+                                )
+                            ),
+                            React.createElement('tbody', null,
+                                campaign.flights.map((flight) =>
+                                    React.createElement('tr', { key: flight.id, className: "hover:bg-gray-50" },
+                                        React.createElement('td', { className: "border border-gray-200 px-4 py-3 text-sm text-gray-900" }, flight.line),
+                                        React.createElement('td', { className: "border border-gray-200 px-4 py-3 text-sm text-gray-900" }, formatDate(flight.startDate)),
+                                        React.createElement('td', { className: "border border-gray-200 px-4 py-3 text-sm text-gray-900" }, formatDate(flight.endDate)),
+                                        React.createElement('td', { className: "border border-gray-200 px-4 py-3" },
+                                            React.createElement('input', {
+                                                type: "number",
+                                                value: flight.budget.toFixed(2),
+                                                onChange: (e) => updateFlight(campaignIndex, flight.id, 'budget', e.target.value),
+                                                className: "w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent",
+                                                step: "0.01"
+                                            })
+                                        ),
+                                        React.createElement('td', { className: "border border-gray-200 px-4 py-3 text-sm text-gray-900" },
+                                            flight.impressions?.toLocaleString() || '-'
+                                        ),
+                                        React.createElement('td', { className: "border border-gray-200 px-4 py-3 text-sm text-gray-900" },
+                                            `$${flight.trafficBudget?.toFixed(2) || '-'}`
+                                        ),
+                                        React.createElement('td', { className: "border border-gray-200 px-4 py-3 text-sm text-gray-900" },
+                                            flight.trafficImpressions?.toLocaleString() || '-'
+                                        ),
+                                        React.createElement('td', { className: "border border-gray-200 px-4 py-3" },
+                                            React.createElement('div', { className: "flex space-x-2" },
+                                                React.createElement('button', {
+                                                    onClick: () => setShowDetailedView({ campaignIndex, flight }),
+                                                    className: "text-blue-600 hover:text-blue-800 px-2 py-1 text-xs border rounded"
+                                                }, "View"),
+                                                React.createElement('button', {
+                                                    onClick: () => zeroOutFlight(campaignIndex, flight.id),
+                                                    className: "text-yellow-600 hover:text-yellow-800 px-2 py-1 text-xs border rounded"
+                                                }, "Zero"),
+                                                React.createElement('button', {
+                                                    onClick: () => deleteFlight(campaignIndex, flight.id),
+                                                    className: "text-red-600 hover:text-red-800 px-2 py-1 text-xs border rounded"
+                                                }, "Delete")
+                                            )
+                                        )
+                                    )
+                                ),
+                                React.createElement('tr', { className: "bg-blue-50 font-semibold" },
+                                    React.createElement('td', { className: "border border-gray-200 px-4 py-3 text-sm text-gray-900" }, "Total"),
+                                    React.createElement('td', { className: "border border-gray-200 px-4 py-3" }),
+                                    React.createElement('td', { className: "border border-gray-200 px-4 py-3" }),
+                                    React.createElement('td', { className: "border border-gray-200 px-4 py-3 text-sm text-gray-900" }, `$${totals.budget.toFixed(2)}`),
+                                    React.createElement('td', { className: "border border-gray-200 px-4 py-3 text-sm text-gray-900" }, totals.impressions.toLocaleString()),
+                                    React.createElement('td', { className: "border border-gray-200 px-4 py-3 text-sm text-gray-900" }, `$${totals.trafficBudget.toFixed(2)}`),
+                                    React.createElement('td', { className: "border border-gray-200 px-4 py-3 text-sm text-gray-900" }, totals.trafficImpressions.toLocaleString()),
+                                    React.createElement('td', { className: "border border-gray-200 px-4 py-3" })
+                                )
+                            )
+                        )
+                    );
+                } else if (campaign.templateType === 'youtube') {
+                    return React.createElement('div', { className: "overflow-x-auto" },
+                        React.createElement('table', { className: "w-full border-collapse" },
+                            React.createElement('thead', null,
+                                React.createElement('tr', { className: "bg-gray-50" },
+                                    React.createElement('th', { className: "border border-gray-200 px-4 py-3 text-left text-sm font-medium text-gray-900" }, "Line"),
+                                    React.createElement('th', { className: "border border-gray-200 px-4 py-3 text-left text-sm font-medium text-gray-900" }, "Flight Start"),
+                                    React.createElement('th', { className: "border border-gray-200 px-4 py-3 text-left text-sm font-medium text-gray-900" }, "Flight End"),
+                                    React.createElement('th', { className: "border border-gray-200 px-4 py-3 text-left text-sm font-medium text-gray-900" }, "Total Views"),
+                                    React.createElement('th', { className: "border border-gray-200 px-4 py-3 text-left text-sm font-medium text-gray-900" }, "Days in Flight"),
+                                    React.createElement('th', { className: "border border-gray-200 px-4 py-3 text-left text-sm font-medium text-gray-900" }, "Daily Views"),
+                                    React.createElement('th', { className: "border border-gray-200 px-4 py-3 text-left text-sm font-medium text-gray-900" }, "Daily Platform Budget"),
+                                    React.createElement('th', { className: "border border-gray-200 px-4 py-3 text-left text-sm font-medium text-gray-900" }, "Total Retail"),
+                                    React.createElement('th', { className: "border border-gray-200 px-4 py-3 text-left text-sm font-medium text-gray-900" }, "Actions")
+                                )
+                            ),
+                            React.createElement('tbody', null,
+                                campaign.flights.map((flight) =>
+                                    React.createElement('tr', { key: flight.id, className: "hover:bg-gray-50" },
+                                        React.createElement('td', { className: "border border-gray-200 px-4 py-3 text-sm text-gray-900" }, flight.line),
+                                        React.createElement('td', { className: "border border-gray-200 px-4 py-3 text-sm text-gray-900" }, formatDate(flight.startDate)),
+                                        React.createElement('td', { className: "border border-gray-200 px-4 py-3 text-sm text-gray-900" }, formatDate(flight.endDate)),
+                                        React.createElement('td', { className: "border border-gray-200 px-4 py-3 text-sm text-gray-900" },
+                                            flight.totalViews?.toLocaleString() || '-'
+                                        ),
+                                        React.createElement('td', { className: "border border-gray-200 px-4 py-3 text-sm text-gray-900" }, flight.daysInFlight || '-'),
+                                        React.createElement('td', { className: "border border-gray-200 px-4 py-3 text-sm text-gray-900" },
+                                            flight.dailyViews?.toFixed(2) || '-'
+                                        ),
+                                        React.createElement('td', { className: "border border-gray-200 px-4 py-3 text-sm text-gray-900" },
+                                            `$${flight.dailyPlatformBudget?.toFixed(2) || '-'}`
+                                        ),
+                                        React.createElement('td', { className: "border border-gray-200 px-4 py-3 text-sm text-gray-900" },
+                                            `$${flight.totalRetail?.toFixed(2) || '-'}`
+                                        ),
+                                        React.createElement('td', { className: "border border-gray-200 px-4 py-3" },
+                                            React.createElement('div', { className: "flex space-x-2" },
+                                                React.createElement('button', {
+                                                    onClick: () => setShowDetailedView({ campaignIndex, flight }),
+                                                    className: "text-blue-600 hover:text-blue-800 px-2 py-1 text-xs border rounded"
+                                                }, "View"),
+                                                React.createElement('button', {
+                                                    onClick: () => zeroOutFlight(campaignIndex, flight.id),
+                                                    className: "text-yellow-600 hover:text-yellow-800 px-2 py-1 text-xs border rounded"
+                                                }, "Zero"),
+                                                React.createElement('button', {
+                                                    onClick: () => deleteFlight(campaignIndex, flight.id),
+                                                    className: "text-red-600 hover:text-red-800 px-2 py-1 text-xs border rounded"
+                                                }, "Delete")
+                                            )
+                                        )
+                                    )
+                                ),
+                                React.createElement('tr', { className: "bg-blue-50 font-semibold" },
+                                    React.createElement('td', { className: "border border-gray-200 px-4 py-3 text-sm text-gray-900" }, "Total"),
+                                    React.createElement('td', { className: "border border-gray-200 px-4 py-3" }),
+                                    React.createElement('td', { className: "border border-gray-200 px-4 py-3" }),
+                                    React.createElement('td', { className: "border border-gray-200 px-4 py-3 text-sm text-gray-900" }, totals.totalViews.toLocaleString()),
+                                    React.createElement('td', { className: "border border-gray-200 px-4 py-3" }),
+                                    React.createElement('td', { className: "border border-gray-200 px-4 py-3" }),
+                                    React.createElement('td', { className: "border border-gray-200 px-4 py-3" }),
+                                    React.createElement('td', { className: "border border-gray-200 px-4 py-3 text-sm text-gray-900" }, `$${totals.totalRetail.toFixed(2)}`),
+                                    React.createElement('td', { className: "border border-gray-200 px-4 py-3" })
+                                )
+                            )
+                        )
+                    );
+                }
+            };
+
+            return React.createElement('div', { className: "min-h-screen bg-gray-50 p-6" },
+                React.createElement('div', { className: "max-w-7xl mx-auto" },
+                    // Header
+                    React.createElement('div', { className: "mb-8" },
+                        React.createElement('h1', { className: "text-3xl font-bold text-gray-900" }, "Media Flight Planning"),
+                        React.createElement('p', { className: "text-gray-600 mt-2" }, "Create and manage budget flight plans across multiple tactics")
+                    ),
+
+                    // Validation Alert
+                    validationAlert && React.createElement('div', { 
+                        className: `mb-6 p-4 rounded-lg border ${
+                            validationAlert.type === 'error' ? 'bg-red-50 border-red-200' : 'bg-yellow-50 border-yellow-200'
+                        }` 
+                    },
+                        React.createElement('p', { 
+                            className: `${
+                                validationAlert.type === 'error' ? 'text-red-800' : 'text-yellow-800'
+                            }` 
+                        }, validationAlert.message),
+                        validationAlert.showProceed && React.createElement('div', { className: "mt-3 flex space-x-3" },
+                            React.createElement('button', {
+                                onClick: () => generateFlightData(true),
+                                className: "px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm"
+                            }, "Proceed Anyway"),
+                            React.createElement('button', {
+                                onClick: () => setValidationAlert(null),
+                                className: "px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm"
+                            }, "Adjust Inputs")
+                        )
+                    ),
+
+                    // Form Card
+                    showForm && React.createElement('div', { className: "bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6" },
+                        React.createElement('h2', { className: "text-xl font-semibold text-gray-900 mb-4" }, "Campaign Setup"),
+                        
+                        React.createElement('div', { className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" },
+                            // Tactic Selection
+                            React.createElement('div', { className: "relative md:col-span-2 lg:col-span-1" },
+                                React.createElement('label', { className: "block text-sm font-medium text-gray-700 mb-2" }, "Tactic *"),
+                                React.createElement('div', { className: "relative" },
+                                    React.createElement('input', {
+                                        type: "text",
+                                        value: searchTerm,
+                                        onChange: (e) => {
+                                            setSearchTerm(e.target.value);
+                                            setShowTacticDropdown(true);
+                                        },
+                                        onFocus: () => setShowTacticDropdown(true),
+                                        placeholder: "Search tactics...",
+                                        className: `w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                                            validationErrors.tactic ? 'border-red-500' : 'border-gray-300'
+                                        }`
+                                    }),
+                                    
+                                    showTacticDropdown && filteredTactics.length > 0 && React.createElement('div', {
+                                        className: "absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto"
+                                    }, filteredTactics.map((tactic, index) =>
+                                        React.createElement('button', {
+                                            key: index,
+                                            onClick: () => handleTacticSelect(tactic),
+                                            className: "w-full px-4 py-2 text-left hover:bg-blue-50 focus:bg-blue-50 focus:outline-none"
+                                        },
+                                            React.createElement('div', { className: "font-medium text-gray-900" },
+                                                `${tactic.product} - ${tactic.subProduct}`
+                                            ),
+                                            React.createElement('div', { className: "text-sm text-gray-500" },
+                                                `${tactic.category} • ${tactic.rate} ${tactic.kpi}`
+                                            )
+                                        )
+                                    ))
+                                ),
+                                validationErrors.tactic && React.createElement('p', { className: "text-red-500 text-sm mt-1" }, validationErrors.tactic)
+                            ),
+
+                            // Date Range
+                            React.createElement('div', { className: "grid grid-cols-2 gap-4 md:col-span-2 lg:col-span-2" },
+                                React.createElement('div', null,
+                                    React.createElement('label', { className: "block text-sm font-medium text-gray-700 mb-2" }, "Flight Start *"),
+                                    React.createElement('input', {
+                                        type: "date",
+                                        value: formData.startDate,
+                                        onChange: (e) => setFormData(prev => ({ ...prev, startDate: e.target.value })),
+                                        className: `w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                                            validationErrors.startDate ? 'border-red-500' : 'border-gray-300'
+                                        }`
+                                    }),
+                                    validationErrors.startDate && React.createElement('p', { className: "text-red-500 text-sm mt-1" }, validationErrors.startDate)
+                                ),
+                                React.createElement('div', null,
+                                    React.createElement('label', { className: "block text-sm font-medium text-gray-700 mb-2" }, "Flight End *"),
+                                    React.createElement('input', {
+                                        type: "date",
+                                        value: formData.endDate,
+                                        onChange: (e) => setFormData(prev => ({ ...prev, endDate: e.target.value })),
+                                        className: `w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                                            validationErrors.endDate ? 'border-red-500' : 'border-gray-300'
+                                        }`
+                                    }),
+                                    validationErrors.endDate && React.createElement('p', { className: "text-red-500 text-sm mt-1" }, validationErrors.endDate)
+                                )
+                            ),
+
+                            // Budget, Rate, and Impressions Row
+                            formData.tactic && React.createElement('div', { className: "md:col-span-3" },
+                                React.createElement('div', { className: "mb-2 text-xs text-blue-600 font-medium" },
+                                    `Budget and ${formData.metricType === 'CPV' ? 'Views' : 'Impressions'} auto-calculate based on your ${formData.metricType} rate`
+                                ),
+                                React.createElement('div', { className: "grid grid-cols-10 gap-4" },
+                                    // Budget - 40% width
+                                    React.createElement('div', { className: "col-span-4" },
+                                        React.createElement('label', { className: "block text-sm font-medium text-gray-700 mb-2" }, "Total Budget *"),
+                                        React.createElement('input', {
+                                            type: "number",
+                                            value: formData.totalBudget,
+                                            onChange: (e) => handleBudgetChange(e.target.value),
+                                            placeholder: "0.00",
+                                            className: `w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                                                validationErrors.totalBudget ? 'border-red-500' : 'border-gray-300'
+                                            }`,
+                                            step: "0.01"
+                                        }),
+                                        validationErrors.totalBudget && React.createElement('p', { className: "text-red-500 text-sm mt-1" }, validationErrors.totalBudget)
+                                    ),
+
+                                    // Rate - 20% width
+                                    React.createElement('div', { className: "col-span-2" },
+                                        React.createElement('label', { className: "block text-sm font-medium text-gray-700 mb-2" }, `${formData.metricType} Rate *`),
+                                        React.createElement('input', {
+                                            type: "number",
+                                            value: formData.rate,
+                                            onChange: (e) => handleRateChange(e.target.value),
+                                            placeholder: "0.00",
+                                            className: `w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                                                validationErrors.rate ? 'border-red-500' : 'border-gray-300'
+                                            }`,
+                                            step: "0.01"
+                                        }),
+                                        validationErrors.rate && React.createElement('p', { className: "text-red-500 text-sm mt-1" }, validationErrors.rate)
+                                    ),
+
+                                    // Impressions/Views - 40% width
+                                    React.createElement('div', { className: "col-span-4" },
+                                        React.createElement('label', { className: "block text-sm font-medium text-gray-700 mb-2" }, 
+                                            `Total ${formData.metricType === 'CPV' ? 'Views' : 'Impressions'} *`
+                                        ),
+                                        React.createElement('input', {
+                                            type: "number",
+                                            value: formData.metricType === 'CPV' ? formData.totalViews : formData.totalImpressions,
+                                            onChange: (e) => {
+                                                if (formData.metricType === 'CPV') {
+                                                    handleViewsChange(e.target.value);
+                                                } else {
+                                                    handleImpressionsChange(e.target.value);
+                                                }
+                                            },
+                                            placeholder: "0",
+                                            className: `w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                                                validationErrors.totalImpressions || validationErrors.totalViews ? 'border-red-500' : 'border-gray-300'
+                                            }`
+                                        }),
+                                        (validationErrors.totalImpressions || validationErrors.totalViews) && React.createElement('p', { className: "text-red-500 text-sm mt-1" },
+                                            validationErrors.totalImpressions || validationErrors.totalViews
+                                        )
+                                    )
+                                )
+                            )
+                        ),
+
+                        React.createElement('div', { className: "mt-6 flex space-x-4" },
+                            React.createElement('button', {
+                                onClick: () => generateFlightData(false),
+                                className: "px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+                            }, "Generate Flight Plan"),
+                            
+                            React.createElement('button', {
+                                onClick: () => {
+                                    setFormData({
+                                        tactic: '',
+                                        startDate: '',
+                                        endDate: '',
+                                        totalBudget: '',
+                                        totalImpressions: '',
+                                        totalViews: '',
+                                        rate: '',
+                                        metricType: 'CPM'
+                                    });
+                                    setSearchTerm('');
+                                    setValidationErrors({});
+                                    setValidationAlert(null);
+                                },
+                                className: "px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+                            }, "Clear"),
+
+                            React.createElement('button', {
+                                onClick: () => {
+                                    setFormData({
+                                        tactic: '',
+                                        startDate: '',
+                                        endDate: '',
+                                        totalBudget: '',
+                                        totalImpressions: '',
+                                        totalViews: '',
+                                        rate: '',
+                                        metricType: 'CPM'
+                                    });
+                                    setSearchTerm('');
+                                    setValidationErrors({});
+                                    setValidationAlert(null);
+                                    setCampaigns([]);
+                                    setActiveTab(0);
+                                    setShowForm(true);
+                                    setShowDetailedView(null);
+                                },
+                                className: "px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-colors"
+                            }, "Start Over")
+                        )
+                    ),
+
+                    // Campaigns Tabs
+                    campaigns.length > 0 && React.createElement('div', { className: "bg-white rounded-lg shadow-sm border border-gray-200" },
+                        // Tab Navigation
+                        React.createElement('div', { className: "border-b border-gray-200" },
+                            React.createElement('nav', { className: "flex space-x-8 px-6" },
+                                campaigns.map((campaign, index) =>
+                                    React.createElement('button', {
+                                        key: campaign.id,
+                                        onClick: () => setActiveTab(index),
+                                        className: `py-4 px-1 border-b-2 font-medium text-sm ${
+                                            activeTab === index
+                                                ? 'border-blue-500 text-blue-600'
+                                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                        }`
+                                    }, campaign.name)
+                                ),
+                                
+                                React.createElement('button', {
+                                    onClick: () => setShowForm(true),
+                                    className: "py-4 px-3 text-sm text-blue-600 hover:text-blue-800"
+                                }, "+ Add Campaign")
+                            )
+                        ),
+
+                        // Active Campaign Content
+                        campaigns[activeTab] && React.createElement('div', { className: "p-6" },
+                            // Campaign Actions
+                            React.createElement('div', { className: "mb-6 flex justify-between items-center" },
+                                React.createElement('h3', { className: "text-lg font-semibold text-gray-900" }, 
+                                    `${campaigns[activeTab].name} Flight Plan`
+                                ),
+                                
+                                React.createElement('div', { className: "flex space-x-2" },
+                                    React.createElement('button', {
+                                        onClick: () => setShowForm(true),
+                                        className: "px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                                    }, "Back to Form"),
+                                    
+                                    React.createElement('button', {
+                                        onClick: () => exportToCSV(campaigns[activeTab]),
+                                        className: "px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                                    }, "Export CSV")
+                                )
+                            ),
+
+                            // Budget Summary
+                            React.createElement('div', { className: "mb-6 grid grid-cols-3 gap-4" },
+                                React.createElement('div', { className: "bg-blue-50 rounded-lg p-4" },
+                                    React.createElement('div', { className: "text-sm font-medium text-blue-600" }, "Total Budget"),
+                                    React.createElement('div', { className: "text-2xl font-bold text-blue-900" },
+                                        `$${campaigns[activeTab].flights.reduce((sum, flight) => sum + flight.budget, 0).toLocaleString()}`
+                                    )
+                                ),
+                                
+                                React.createElement('div', { className: "bg-green-50 rounded-lg p-4" },
+                                    React.createElement('div', { className: "text-sm font-medium text-green-600" }, "Active Flights"),
+                                    React.createElement('div', { className: "text-2xl font-bold text-green-900" },
+                                        campaigns[activeTab].flights.filter(f => f.budget > 0).length
+                                    )
+                                ),
+                                
+                                React.createElement('div', { className: "bg-purple-50 rounded-lg p-4" },
+                                    React.createElement('div', { className: "text-sm font-medium text-purple-600" }, "Template Type"),
+                                    React.createElement('div', { className: "text-lg font-bold text-purple-900 capitalize" },
+                                        campaigns[activeTab].templateType.replace('-', ' / ')
+                                    )
+                                )
+                            ),
+
+                            // Flight Table
+                            renderTable(campaigns[activeTab], activeTab)
+                        )
+                    ),
+
+                    // Detailed View Modal
+                    showDetailedView && React.createElement('div', { className: "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" },
+                        React.createElement('div', { className: "bg-white rounded-lg p-6 max-w-2xl w-full mx-4" },
+                            React.createElement('div', { className: "flex justify-between items-center mb-4" },
+                                React.createElement('h3', { className: "text-lg font-semibold text-gray-900" }, "Flight Details"),
+                                React.createElement('button', {
+                                    onClick: () => setShowDetailedView(null),
+                                    className: "text-gray-400 hover:text-gray-600 text-xl"
+                                }, "×")
+                            ),
+                            
+                            React.createElement('div', { className: "grid grid-cols-2 gap-4" },
+                                React.createElement('div', null,
+                                    React.createElement('label', { className: "block text-sm font-medium text-gray-700" }, "Line"),
+                                    React.createElement('p', { className: "text-lg text-gray-900" }, showDetailedView.flight.line)
+                                ),
+                                React.createElement('div', null,
+                                    React.createElement('label', { className: "block text-sm font-medium text-gray-700" }, "Budget"),
+                                    React.createElement('p', { className: "text-lg text-gray-900" }, `$${showDetailedView.flight.budget.toFixed(2)}`)
+                                ),
+                                React.createElement('div', null,
+                                    React.createElement('label', { className: "block text-sm font-medium text-gray-700" }, "Start Date"),
+                                    React.createElement('p', { className: "text-lg text-gray-900" }, formatDate(showDetailedView.flight.startDate))
+                                ),
+                                React.createElement('div', null,
+                                    React.createElement('label', { className: "block text-sm font-medium text-gray-700" }, "End Date"),
+                                    React.createElement('p', { className: "text-lg text-gray-900" }, formatDate(showDetailedView.flight.endDate))
+                                )
+                            )
+                        )
+                    ),
+
+                    // Empty State
+                    campaigns.length === 0 && !showForm && React.createElement('div', { className: "text-center py-12" },
+                        React.createElement('h3', { className: "mt-2 text-sm font-medium text-gray-900" }, "No campaigns yet"),
+                        React.createElement('p', { className: "mt-1 text-sm text-gray-500" }, "Get started by creating your first campaign flight plan."),
+                        React.createElement('div', { className: "mt-6" },
+                            React.createElement('button', {
+                                onClick: () => setShowForm(true),
+                                className: "px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+                            }, "Create Campaign")
+                        )
+                    )
+                )
+            );
+        };
+
+        // Render the app
+        const container = document.getElementById('root');
+        const root = ReactDOM.createRoot(container);
+        root.render(React.createElement(MediaFlightPlanner));
+    </script>
+</body>
+</html>
