@@ -13,11 +13,11 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useMemo } = React;
+        const { useState, useMemo, useEffect, useRef } = React;
 
         const MediaFlightPlanner = () => {
-            // Tactic data
-            const tacticData = [
+            // Default tactic data (fallback)
+            const defaultTacticData = [
                 { category: "Email Marketing", product: "Email Marketing", subProduct: "1:1 Marketing", rate: "$24.00", kpi: "CPM" },
                 { category: "Email Marketing", product: "Email Marketing", subProduct: "B2B (Business Targeting)", rate: "$24.00", kpi: "CPM" },
                 { category: "Email Marketing", product: "Email Marketing", subProduct: "B2C (Consumer Targeting)", rate: "$30.00", kpi: "CPM" },
@@ -44,12 +44,16 @@
                 { category: "Local Display", product: "Takeovers", subProduct: "Homepage", rate: "$25.00", kpi: "CPM" },
                 { category: "Local Display", product: "Sponsorship", subProduct: "Standard", rate: "$15.00", kpi: "CPM" }
             ];
+            
+            // Tactic data state (will be updated from API)
+            const [tacticData, setTacticData] = useState(defaultTacticData);
+            const [tacticsLoading, setTacticsLoading] = useState(true);
+            const [tacticsError, setTacticsError] = useState('');
 
             // State management
             const [activeTab, setActiveTab] = useState(0);
             const [campaigns, setCampaigns] = useState([]);
             const [showForm, setShowForm] = useState(true);
-            const [showDetailedView, setShowDetailedView] = useState(null);
             const [validationAlert, setValidationAlert] = useState(null);
             
             // Form state
@@ -68,6 +72,9 @@
             const [showTacticDropdown, setShowTacticDropdown] = useState(false);
             const [validationErrors, setValidationErrors] = useState({});
             
+            // Ref for tactic dropdown
+            const tacticDropdownRef = useRef(null);
+            
             // Order import state
             const [orderLink, setOrderLink] = useState('');
             const [orderTactics, setOrderTactics] = useState([]);
@@ -75,10 +82,256 @@
             const [showOrderTactics, setShowOrderTactics] = useState(false);
             const [orderLoading, setOrderLoading] = useState(false);
             const [orderError, setOrderError] = useState('');
+            
+            // Campaign editing state
+            const [editingCampaignName, setEditingCampaignName] = useState(null);
+            const [showViewAllModal, setShowViewAllModal] = useState(false);
+            
+            // Fetch tactics from API on component mount
+            useEffect(() => {
+                const fetchTactics = async () => {
+                    setTacticsLoading(true);
+                    setTacticsError('');
+                    
+                    try {
+                        const response = await fetch('https://ignite.edwinlovett.com/kpi/api.php?action=get_tactics');
+                        if (!response.ok) {
+                            throw new Error(`Failed to fetch tactics: ${response.status}`);
+                        }
+                        
+                        const apiTactics = await response.json();
+                        
+                        // Map API response to our tactic structure
+                        const mappedTactics = apiTactics.map(tactic => {
+                            // Determine category based on tactic name/product
+                            let category = 'Programmatic'; // default
+                            let product = tactic.name || '';
+                            let subProduct = '';
+                            
+                            // Parse the tactic name to extract product and subProduct
+                            if (tactic.name) {
+                                // Handle Email Marketing
+                                if (tactic.name.toLowerCase().includes('email')) {
+                                    category = 'Email Marketing';
+                                    product = 'Email Marketing';
+                                    if (tactic.name.includes('1:1')) {
+                                        subProduct = '1:1 Marketing';
+                                    } else if (tactic.name.includes('B2B')) {
+                                        subProduct = 'B2B (Business Targeting)';
+                                    } else if (tactic.name.includes('B2C')) {
+                                        subProduct = 'B2C (Consumer Targeting)';
+                                    } else {
+                                        subProduct = tactic.name.replace('Email Marketing', '').trim();
+                                    }
+                                }
+                                // Handle Social Media
+                                else if (tactic.name.toLowerCase().includes('meta') || 
+                                        tactic.name.toLowerCase().includes('facebook') || 
+                                        tactic.name.toLowerCase().includes('instagram')) {
+                                    category = 'Social';
+                                    if (tactic.name.toLowerCase().includes('facebook')) {
+                                        product = 'Meta';
+                                        subProduct = 'Facebook';
+                                    } else if (tactic.name.toLowerCase().includes('instagram')) {
+                                        product = 'Meta';
+                                        subProduct = 'Instagram';
+                                    } else {
+                                        product = 'Meta';
+                                        subProduct = tactic.name.replace('Meta', '').trim() || 'Standard';
+                                    }
+                                }
+                                else if (tactic.name.toLowerCase().includes('snapchat') ||
+                                        tactic.name.toLowerCase().includes('tiktok') ||
+                                        tactic.name.toLowerCase().includes('twitter') ||
+                                        tactic.name.toLowerCase().includes('pinterest') ||
+                                        tactic.name.toLowerCase().includes('linkedin')) {
+                                    category = 'Social';
+                                    // Extract product name
+                                    if (tactic.name.toLowerCase().includes('snapchat')) product = 'Snapchat';
+                                    else if (tactic.name.toLowerCase().includes('tiktok')) product = 'TikTok';
+                                    else if (tactic.name.toLowerCase().includes('twitter')) product = 'Twitter';
+                                    else if (tactic.name.toLowerCase().includes('pinterest')) product = 'Pinterest';
+                                    else if (tactic.name.toLowerCase().includes('linkedin')) product = 'LinkedIn';
+                                    subProduct = 'Standard';
+                                }
+                                // Handle YouTube
+                                else if (tactic.name.toLowerCase().includes('youtube')) {
+                                    category = 'Programmatic';
+                                    product = 'YouTube';
+                                    if (tactic.name.toLowerCase().includes('trueview')) {
+                                        subProduct = 'TrueView';
+                                    } else if (tactic.name.toLowerCase().includes('bumper')) {
+                                        subProduct = 'Bumper';
+                                    } else if (tactic.name.toLowerCase().includes('shorts')) {
+                                        subProduct = 'Shorts';
+                                    } else {
+                                        subProduct = 'Standard';
+                                    }
+                                }
+                                // Handle Google/SEM
+                                else if (tactic.name.toLowerCase().includes('sem') || 
+                                        tactic.name.toLowerCase().includes('google')) {
+                                    category = 'Google';
+                                    if (tactic.name.toLowerCase().includes('sem')) {
+                                        product = 'SEM';
+                                        if (tactic.name.toLowerCase().includes('search')) {
+                                            subProduct = 'Search';
+                                        } else if (tactic.name.toLowerCase().includes('display')) {
+                                            subProduct = 'Display';
+                                        } else {
+                                            subProduct = 'Search';
+                                        }
+                                    } else if (tactic.name.toLowerCase().includes('spark')) {
+                                        product = 'Spark';
+                                        subProduct = 'Standard';
+                                    } else {
+                                        product = tactic.name.includes('SEM') ? 'SEM' : 'Google';
+                                        subProduct = 'Standard';
+                                    }
+                                }
+                                // Handle Programmatic
+                                else if (tactic.name.toLowerCase().includes('programmatic')) {
+                                    category = 'Programmatic';
+                                    if (tactic.name.toLowerCase().includes('audio')) {
+                                        product = 'Programmatic Audio';
+                                        if (tactic.name.includes('AAT')) {
+                                            subProduct = 'AAT';
+                                        } else if (tactic.name.includes('RON')) {
+                                            subProduct = 'RON';
+                                        } else {
+                                            subProduct = 'Standard';
+                                        }
+                                    } else if (tactic.name.toLowerCase().includes('addressable')) {
+                                        product = 'Addressable Solutions';
+                                        if (tactic.name.includes('CTV')) {
+                                            subProduct = 'CTV';
+                                        } else if (tactic.name.includes('Local CTV')) {
+                                            subProduct = 'Local CTV';
+                                        } else {
+                                            subProduct = 'Standard';
+                                        }
+                                    } else if (tactic.name.toLowerCase().includes('blended')) {
+                                        product = 'Blended Tactics';
+                                        subProduct = 'Standard';
+                                    } else if (tactic.name.toLowerCase().includes('stv')) {
+                                        product = 'STV';
+                                        subProduct = 'Local';
+                                    } else {
+                                        // Parse from name
+                                        const parts = tactic.name.split(' - ');
+                                        product = parts[0] || tactic.name;
+                                        subProduct = parts[1] || 'Standard';
+                                    }
+                                }
+                                // Handle Local Display
+                                else if (tactic.name.toLowerCase().includes('display') || 
+                                        tactic.name.toLowerCase().includes('takeover') ||
+                                        tactic.name.toLowerCase().includes('sponsorship')) {
+                                    category = 'Local Display';
+                                    if (tactic.name.toLowerCase().includes('takeover')) {
+                                        product = 'Takeovers';
+                                        subProduct = 'Homepage';
+                                    } else if (tactic.name.toLowerCase().includes('sponsorship')) {
+                                        product = 'Sponsorship';
+                                        subProduct = 'Standard';
+                                    } else {
+                                        product = 'CPM Display';
+                                        subProduct = 'Standard';
+                                    }
+                                }
+                                // Generic parsing for others
+                                else {
+                                    const parts = tactic.name.split(' - ');
+                                    if (parts.length >= 2) {
+                                        product = parts[0];
+                                        subProduct = parts[1];
+                                    } else {
+                                        product = tactic.name;
+                                        subProduct = 'Standard';
+                                    }
+                                }
+                            }
+                            
+                            // Format the rate value
+                            let rate = '$0.00';
+                            if (tactic.value) {
+                                const numValue = parseFloat(tactic.value);
+                                if (!isNaN(numValue)) {
+                                    rate = `$${numValue.toFixed(2)}`;
+                                }
+                            }
+                            
+                            // Determine KPI type from API type field
+                            let kpi = tactic.type || 'CPM';
+                            if (kpi === 'CPV' || product === 'YouTube' && subProduct === 'TrueView') {
+                                kpi = 'CPV';
+                            } else if (product === 'SEM' && subProduct === 'Search') {
+                                kpi = 'CPLC';
+                            }
+                            
+                            return {
+                                category,
+                                product,
+                                subProduct,
+                                rate,
+                                kpi,
+                                originalName: tactic.name // Keep original for debugging
+                            };
+                        });
+                        
+                        // If we got valid tactics from API, use them
+                        if (mappedTactics.length > 0) {
+                            setTacticData(mappedTactics);
+                        } else {
+                            // Keep default tactics if API returns empty
+                            console.warn('API returned no tactics, using defaults');
+                        }
+                    } catch (error) {
+                        console.error('Error fetching tactics:', error);
+                        setTacticsError('Failed to load updated rates. Using default values.');
+                        // Keep using default tactics on error
+                    } finally {
+                        setTacticsLoading(false);
+                    }
+                };
+                
+                // Fetch tactics on mount
+                fetchTactics();
+            }, []); // Empty dependency array means this runs once on mount
+            
+            // Handle clicks outside of tactic dropdown
+            useEffect(() => {
+                const handleClickOutside = (event) => {
+                    if (tacticDropdownRef.current && !tacticDropdownRef.current.contains(event.target)) {
+                        setShowTacticDropdown(false);
+                    }
+                };
+                
+                if (showTacticDropdown) {
+                    document.addEventListener('mousedown', handleClickOutside);
+                    return () => {
+                        document.removeEventListener('mousedown', handleClickOutside);
+                    };
+                }
+            }, [showTacticDropdown]);
 
-            // Format date to MM/DD/YYYY
+            // Format date to MM/DD/YYYY (with proper timezone handling)
             const formatDate = (dateString) => {
-                const date = new Date(dateString);
+                if (!dateString) return '';
+                
+                // Handle different date formats and ensure local timezone
+                let date;
+                if (dateString.includes('T') || dateString.includes('Z')) {
+                    // ISO string - extract just the date part to avoid timezone issues
+                    const datePart = dateString.split('T')[0];
+                    const [year, month, day] = datePart.split('-').map(Number);
+                    date = new Date(year, month - 1, day); // month is 0-based
+                } else {
+                    // Already a date string in YYYY-MM-DD format
+                    const [year, month, day] = dateString.split('-').map(Number);
+                    date = new Date(year, month - 1, day); // month is 0-based
+                }
+                
                 return date.toLocaleDateString('en-US');
             };
 
@@ -88,23 +341,38 @@
                 return Math.round(parseFloat(value));
             };
 
-            // Extract order number from Lumina link
-            const extractOrderNumber = (link) => {
-                if (!link) return '';
+            // Extract ID and type from Lumina link
+            const extractLuminaInfo = (link) => {
+                if (!link) return { id: '', type: 'order' };
                 
-                // Remove base URL and query parameters
-                const regex = /https:\/\/townsquarelumina\.com\/lumina\/view\/order\/([a-f0-9]+)/;
-                const match = link.match(regex);
-                return match ? match[1] : '';
+                // Check for order URL
+                const orderRegex = /https:\/\/townsquarelumina\.com\/lumina\/view\/order\/([a-f0-9]+)/;
+                const orderMatch = link.match(orderRegex);
+                if (orderMatch) {
+                    return { id: orderMatch[1], type: 'order' };
+                }
+                
+                // Check for lineitem URL
+                const lineitemRegex = /https:\/\/townsquarelumina\.com\/lumina\/view\/lineitem\/[^/]+\/([a-f0-9]+)/;
+                const lineitemMatch = link.match(lineitemRegex);
+                if (lineitemMatch) {
+                    return { id: lineitemMatch[1], type: 'lineitem' };
+                }
+                
+                return { id: '', type: 'order' };
             };
 
-            // Fetch order data from API
-            const fetchOrderData = async (orderNumber) => {
+            // Fetch order/lineitem data from API
+            const fetchLuminaData = async (id, type) => {
                 setOrderLoading(true);
                 setOrderError('');
                 
                 try {
-                    const response = await fetch(`https://api.edwinlovett.com/order?query=${orderNumber}`);
+                    const url = type === 'lineitem' 
+                        ? `https://api.edwinlovett.com/order?query=${id}&type=lineitem`
+                        : `https://api.edwinlovett.com/order?query=${id}`;
+                    
+                    const response = await fetch(url);
                     if (!response.ok) {
                         throw new Error(`API request failed: ${response.status}`);
                     }
@@ -119,19 +387,33 @@
                 }
             };
 
-            // Process order data and extract tactics
-            const processOrderData = (orderData) => {
-                if (!orderData || !orderData.lineItems) return [];
+            // Process lumina data and extract tactics
+            const processLuminaData = (luminaData) => {
+                if (!luminaData) return [];
                 
-                return orderData.lineItems.map((lineItem, index) => {
+                let lineItems = [];
+                
+                // Handle different response types
+                if (luminaData.type === 'lineitem') {
+                    // Single line item response
+                    lineItems = [luminaData.lineItem];
+                } else if (luminaData.type === 'order') {
+                    // Order response with multiple line items
+                    lineItems = luminaData.lineItems || [];
+                } else {
+                    // Legacy format (fallback)
+                    lineItems = luminaData.lineItems || [];
+                }
+                
+                return lineItems.map((lineItem, index) => {
                     const product = lineItem.product || '';
                     const subProduct = lineItem.subProduct?.[0] || lineItem.subProduct || '';
                     
                     return {
                         id: lineItem.lineitemId || `order-tactic-${index}`,
                         status: lineItem.status || '',
-                        startDate: lineItem.startDate ? new Date(lineItem.startDate).toISOString().split('T')[0] : '',
-                        endDate: lineItem.endDate ? new Date(lineItem.endDate).toISOString().split('T')[0] : '',
+                        startDate: lineItem.startDate ? formatDateForInput(lineItem.startDate) : '',
+                        endDate: lineItem.endDate ? formatDateForInput(lineItem.endDate) : '',
                         product: product,
                         subProduct: subProduct,
                         totalBudget: lineItem.totalBudget || lineItem.adjustedTotalBudget || 0,
@@ -146,17 +428,17 @@
                 }).filter(tactic => tactic.product && tactic.totalBudget > 0);
             };
 
-            // Handle order link import
+            // Handle order/lineitem link import
             const handleOrderImport = async () => {
-                const orderNumber = extractOrderNumber(orderLink);
-                if (!orderNumber) {
-                    setOrderError('Invalid Lumina link format');
+                const luminaInfo = extractLuminaInfo(orderLink);
+                if (!luminaInfo.id) {
+                    setOrderError('Invalid Lumina link format. Please use an order or lineitem URL.');
                     return;
                 }
 
-                const orderData = await fetchOrderData(orderNumber);
-                if (orderData) {
-                    const tactics = processOrderData(orderData);
+                const luminaData = await fetchLuminaData(luminaInfo.id, luminaInfo.type);
+                if (luminaData) {
+                    const tactics = processLuminaData(luminaData);
                     setOrderTactics(tactics);
                     setSelectedOrderTactics(tactics.map(t => t.id));
                     setShowOrderTactics(true);
@@ -194,8 +476,8 @@
                         const flight = {
                             id: Date.now() + index + Math.random(),
                             line: index + 1,
-                            startDate: startDate.toISOString().split('T')[0],
-                            endDate: endDate.toISOString().split('T')[0],
+                            startDate: formatDateForInput(startDate),
+                            endDate: formatDateForInput(endDate),
                             budget: budgetPerMonth
                         };
                         
@@ -249,7 +531,7 @@
                     `${tactic.product} - ${tactic.subProduct}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
                     tactic.category.toLowerCase().includes(searchTerm.toLowerCase())
                 );
-            }, [searchTerm]);
+            }, [searchTerm, tacticData]);
 
             // Get template type based on selected tactic
             const getTemplateType = (tacticString) => {
@@ -349,12 +631,38 @@
                 setShowTacticDropdown(false);
             };
 
-            // Calculate months between dates
+            // Calculate months between dates (timezone-safe)
             const getMonthsBetween = (startDate, endDate) => {
-                const start = new Date(startDate);
-                const end = new Date(endDate);
-                const months = [];
+                // Parse dates safely to avoid timezone issues
+                let start, end;
                 
+                if (typeof startDate === 'string') {
+                    if (startDate.includes('T') || startDate.includes('Z')) {
+                        const datePart = startDate.split('T')[0];
+                        const [year, month, day] = datePart.split('-').map(Number);
+                        start = new Date(year, month - 1, day);
+                    } else {
+                        const [year, month, day] = startDate.split('-').map(Number);
+                        start = new Date(year, month - 1, day);
+                    }
+                } else {
+                    start = new Date(startDate);
+                }
+                
+                if (typeof endDate === 'string') {
+                    if (endDate.includes('T') || endDate.includes('Z')) {
+                        const datePart = endDate.split('T')[0];
+                        const [year, month, day] = datePart.split('-').map(Number);
+                        end = new Date(year, month - 1, day);
+                    } else {
+                        const [year, month, day] = endDate.split('-').map(Number);
+                        end = new Date(year, month - 1, day);
+                    }
+                } else {
+                    end = new Date(endDate);
+                }
+                
+                const months = [];
                 const current = new Date(start.getFullYear(), start.getMonth(), 1);
                 const lastMonth = new Date(end.getFullYear(), end.getMonth(), 1);
                 
@@ -364,6 +672,31 @@
                 }
                 
                 return months;
+            };
+            
+            // Helper function to safely format date for form inputs (YYYY-MM-DD)
+            const formatDateForInput = (date) => {
+                if (!date) return '';
+                
+                let dateObj;
+                if (typeof date === 'string') {
+                    if (date.includes('T') || date.includes('Z')) {
+                        const datePart = date.split('T')[0];
+                        const [year, month, day] = datePart.split('-').map(Number);
+                        dateObj = new Date(year, month - 1, day);
+                    } else {
+                        const [year, month, day] = date.split('-').map(Number);
+                        dateObj = new Date(year, month - 1, day);
+                    }
+                } else {
+                    dateObj = new Date(date);
+                }
+                
+                const year = dateObj.getFullYear();
+                const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+                const day = String(dateObj.getDate()).padStart(2, '0');
+                
+                return `${year}-${month}-${day}`;
             };
 
             // Validation function
@@ -416,8 +749,8 @@
                     const flight = {
                         id: Date.now() + index,
                         line: index + 1,
-                        startDate: startDate.toISOString().split('T')[0],
-                        endDate: endDate.toISOString().split('T')[0],
+                        startDate: formatDateForInput(startDate),
+                        endDate: formatDateForInput(endDate),
                         budget: budgetPerMonth
                     };
                     
@@ -506,10 +839,24 @@
                     const flightIndex = campaign.flights.findIndex(f => f.id === flightId);
                     
                     if (flightIndex !== -1) {
-                        const zeroBudget = campaign.flights[flightIndex].budget;
-                        campaign.flights[flightIndex].budget = 0;
+                        const flight = campaign.flights[flightIndex];
+                        const zeroBudget = flight.budget;
                         
-                        const otherFlights = campaign.flights.filter((_, i) => i !== flightIndex && campaign.flights[i].budget > 0);
+                        // Zero out all related fields
+                        flight.budget = 0;
+                        if (flight.impressions !== undefined) flight.impressions = 0;
+                        if (flight.trafficBudget !== undefined) flight.trafficBudget = 0;
+                        if (flight.trafficImpressions !== undefined) flight.trafficImpressions = 0;
+                        if (flight.totalViews !== undefined) flight.totalViews = 0;
+                        if (flight.dailyViews !== undefined) flight.dailyViews = 0;
+                        if (flight.dailyPlatformBudget !== undefined) flight.dailyPlatformBudget = 0;
+                        if (flight.totalRetail !== undefined) flight.totalRetail = 0;
+                        
+                        // Redistribute budget to other unlocked flights
+                        const otherFlights = campaign.flights.filter((_, i) => 
+                            i !== flightIndex && campaign.flights[i].budget > 0 && !campaign.flights[i].locked
+                        );
+                        
                         if (otherFlights.length > 0) {
                             const redistributeAmount = zeroBudget / otherFlights.length;
                             otherFlights.forEach(flight => {
@@ -521,6 +868,88 @@
                                 }
                             });
                         }
+                    }
+                    
+                    return updated;
+                });
+            };
+            
+            // Update campaign name
+            const updateCampaignName = (campaignIndex, newName) => {
+                setCampaigns(prev => {
+                    const updated = [...prev];
+                    updated[campaignIndex].name = newName;
+                    return updated;
+                });
+            };
+            
+            // Delete campaign
+            const deleteCampaign = (campaignIndex) => {
+                setCampaigns(prev => {
+                    const updated = prev.filter((_, index) => index !== campaignIndex);
+                    if (activeTab >= updated.length) {
+                        setActiveTab(Math.max(0, updated.length - 1));
+                    }
+                    return updated;
+                });
+            };
+            
+            // Split flight into two
+            const splitFlight = (campaignIndex, flightId) => {
+                setCampaigns(prev => {
+                    const updated = [...prev];
+                    const campaign = updated[campaignIndex];
+                    const flightIndex = campaign.flights.findIndex(f => f.id === flightId);
+                    
+                    if (flightIndex !== -1) {
+                        const flight = campaign.flights[flightIndex];
+                        const startDate = new Date(flight.startDate);
+                        const endDate = new Date(flight.endDate);
+                        
+                        // Calculate midpoint
+                        const totalDays = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
+                        const halfDays = Math.ceil(totalDays / 2);
+                        const midDate = new Date(startDate);
+                        midDate.setDate(startDate.getDate() + halfDays);
+                        
+                        // Split budget and other metrics in half
+                        const halfBudget = flight.budget / 2;
+                        const halfImpressions = Math.round((flight.impressions || 0) / 2);
+                        
+                        // Create first flight (original dates until midpoint)
+                        const firstFlight = {
+                            ...flight,
+                            id: Date.now() + Math.random(),
+                            line: '-',
+                            endDate: formatDateForInput(new Date(midDate.getTime() - 24 * 60 * 60 * 1000)), // day before midDate
+                            budget: halfBudget,
+                            impressions: halfImpressions,
+                            trafficBudget: campaign.templateType === 'programmatic' ? halfBudget * 1.01 : undefined,
+                            trafficImpressions: campaign.templateType === 'programmatic' ? gracefulRound((halfBudget * 1.01 / parseFloat(campaign.formData.rate)) * 1000) : undefined
+                        };
+                        
+                        // Create second flight (midpoint until original end)
+                        const secondFlight = {
+                            ...flight,
+                            id: Date.now() + Math.random() + 1,
+                            line: '-',
+                            startDate: formatDateForInput(midDate),
+                            budget: halfBudget,
+                            impressions: halfImpressions,
+                            trafficBudget: campaign.templateType === 'programmatic' ? halfBudget * 1.01 : undefined,
+                            trafficImpressions: campaign.templateType === 'programmatic' ? gracefulRound((halfBudget * 1.01 / parseFloat(campaign.formData.rate)) * 1000) : undefined
+                        };
+                        
+                        // Replace original flight with two new flights
+                        campaign.flights.splice(flightIndex, 1, firstFlight, secondFlight);
+                        
+                        // Update line numbers for numbered flights
+                        let lineNumber = 1;
+                        campaign.flights.forEach(flight => {
+                            if (flight.line !== '-') {
+                                flight.line = lineNumber++;
+                            }
+                        });
                     }
                     
                     return updated;
@@ -608,7 +1037,7 @@
                             React.createElement('tbody', null,
                                 campaign.flights.map((flight) =>
                                     React.createElement('tr', { key: flight.id, className: "hover:bg-gray-50" },
-                                        React.createElement('td', { className: "border border-gray-200 px-4 py-3 text-sm text-gray-900" }, flight.line),
+                                        React.createElement('td', { className: "border border-gray-200 px-4 py-3 text-sm text-gray-900 text-center" }, flight.line),
                                         React.createElement('td', { className: "border border-gray-200 px-4 py-3 text-sm text-gray-900" }, formatDate(flight.startDate)),
                                         React.createElement('td', { className: "border border-gray-200 px-4 py-3 text-sm text-gray-900" }, formatDate(flight.endDate)),
                                         React.createElement('td', { className: "border border-gray-200 px-4 py-3" },
@@ -623,15 +1052,35 @@
                                         React.createElement('td', { className: "border border-gray-200 px-4 py-3" },
                                             React.createElement('div', { className: "flex space-x-2" },
                                                 React.createElement('button', {
-                                                    onClick: () => setShowDetailedView({ campaignIndex, flight }),
+                                                    onClick: () => splitFlight(campaignIndex, flight.id),
                                                     className: "text-blue-600 hover:text-blue-800 px-2 py-1 text-xs border rounded",
-                                                    title: "View Details"
-                                                }, "View"),
+                                                    title: "Split Flight"
+                                                }, "Split"),
                                                 React.createElement('button', {
                                                     onClick: () => zeroOutFlight(campaignIndex, flight.id),
                                                     className: "text-yellow-600 hover:text-yellow-800 px-2 py-1 text-xs border rounded",
                                                     title: "Zero Budget"
                                                 }, "Zero"),
+                                                React.createElement('button', {
+                                                    onClick: () => {
+                                                        setCampaigns(prev => {
+                                                            const updated = [...prev];
+                                                            const flightIndex = updated[campaignIndex].flights.findIndex(f => f.id === flight.id);
+                                                            if (flightIndex !== -1) {
+                                                                updated[campaignIndex].flights[flightIndex].locked = !updated[campaignIndex].flights[flightIndex].locked;
+                                                            }
+                                                            return updated;
+                                                        });
+                                                    },
+                                                    className: `${flight.locked ? 'text-orange-600 hover:text-orange-800' : 'text-gray-400 hover:text-gray-600'} px-2 py-1 text-xs border rounded`,
+                                                    title: flight.locked ? "Unlock" : "Lock"
+                                                },
+                                                    React.createElement('svg', { className: "w-3 h-3", fill: "currentColor", viewBox: "0 0 20 20" },
+                                                        flight.locked ? 
+                                                            React.createElement('path', { fillRule: "evenodd", d: "M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z", clipRule: "evenodd" }) :
+                                                            React.createElement('path', { fillRule: "evenodd", d: "M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zM8 9V5.5a2 2 0 114 0V9H8z", clipRule: "evenodd" })
+                                                    )
+                                                ),
                                                 React.createElement('button', {
                                                     onClick: () => deleteFlight(campaignIndex, flight.id),
                                                     className: "text-red-600 hover:text-red-800 px-2 py-1 text-xs border rounded",
@@ -669,7 +1118,7 @@
                             React.createElement('tbody', null,
                                 campaign.flights.map((flight) =>
                                     React.createElement('tr', { key: flight.id, className: "hover:bg-gray-50" },
-                                        React.createElement('td', { className: "border border-gray-200 px-4 py-3 text-sm text-gray-900" }, flight.line),
+                                        React.createElement('td', { className: "border border-gray-200 px-4 py-3 text-sm text-gray-900 text-center" }, flight.line),
                                         React.createElement('td', { className: "border border-gray-200 px-4 py-3 text-sm text-gray-900" }, formatDate(flight.startDate)),
                                         React.createElement('td', { className: "border border-gray-200 px-4 py-3 text-sm text-gray-900" }, formatDate(flight.endDate)),
                                         React.createElement('td', { className: "border border-gray-200 px-4 py-3" },
@@ -693,9 +1142,10 @@
                                         React.createElement('td', { className: "border border-gray-200 px-4 py-3" },
                                             React.createElement('div', { className: "flex space-x-2" },
                                                 React.createElement('button', {
-                                                    onClick: () => setShowDetailedView({ campaignIndex, flight }),
-                                                    className: "text-blue-600 hover:text-blue-800 px-2 py-1 text-xs border rounded"
-                                                }, "View"),
+                                                    onClick: () => splitFlight(campaignIndex, flight.id),
+                                                    className: "text-blue-600 hover:text-blue-800 px-2 py-1 text-xs border rounded",
+                                                    title: "Split Flight"
+                                                }, "Split"),
                                                 React.createElement('button', {
                                                     onClick: () => zeroOutFlight(campaignIndex, flight.id),
                                                     className: "text-yellow-600 hover:text-yellow-800 px-2 py-1 text-xs border rounded"
@@ -740,7 +1190,7 @@
                             React.createElement('tbody', null,
                                 campaign.flights.map((flight) =>
                                     React.createElement('tr', { key: flight.id, className: "hover:bg-gray-50" },
-                                        React.createElement('td', { className: "border border-gray-200 px-4 py-3 text-sm text-gray-900" }, flight.line),
+                                        React.createElement('td', { className: "border border-gray-200 px-4 py-3 text-sm text-gray-900 text-center" }, flight.line),
                                         React.createElement('td', { className: "border border-gray-200 px-4 py-3 text-sm text-gray-900" }, formatDate(flight.startDate)),
                                         React.createElement('td', { className: "border border-gray-200 px-4 py-3 text-sm text-gray-900" }, formatDate(flight.endDate)),
                                         React.createElement('td', { className: "border border-gray-200 px-4 py-3 text-sm text-gray-900" },
@@ -826,39 +1276,59 @@
                     showForm && React.createElement('div', { className: "bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6" },
                         React.createElement('h2', { className: "text-xl font-semibold text-gray-900 mb-4" }, "Campaign Setup"),
                         
+                        // Tactics loading error notification
+                        tacticsError && React.createElement('div', { 
+                            className: "mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg flex items-center" 
+                        },
+                            React.createElement('svg', { 
+                                className: "w-5 h-5 text-yellow-600 mr-2", 
+                                fill: "none", 
+                                strokeLinecap: "round", 
+                                strokeLinejoin: "round", 
+                                strokeWidth: "2", 
+                                viewBox: "0 0 24 24", 
+                                stroke: "currentColor" 
+                            },
+                                React.createElement('path', { d: "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" })
+                            ),
+                            React.createElement('span', { className: "text-sm text-yellow-800" }, tacticsError)
+                        ),
+                        
                         // Order Import Section
                         React.createElement('div', { className: "mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200" },
-                            React.createElement('h3', { className: "text-lg font-medium text-blue-900 mb-3" }, "Import from Lumina Order"),
-                            React.createElement('div', { className: "grid grid-cols-1 md:grid-cols-3 gap-4" },
-                                React.createElement('div', { className: "md:col-span-2" },
-                                    React.createElement('label', { className: "block text-sm font-medium text-blue-700 mb-2" }, "Lumina Order Link"),
-                                    React.createElement('input', {
-                                        type: "url",
-                                        value: orderLink,
-                                        onChange: (e) => {
-                                            setOrderLink(e.target.value);
-                                            setOrderError('');
-                                        },
-                                        placeholder: "https://townsquarelumina.com/lumina/view/order/...",
-                                        className: "w-full px-3 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                    }),
-                                    orderError && React.createElement('p', { className: "text-red-600 text-sm mt-1" }, orderError)
+                            React.createElement('h3', { className: "text-lg font-medium text-blue-900 mb-3" }, "Import from Lumina"),
+                            React.createElement('div', null,
+                                React.createElement('label', { className: "block text-sm font-medium text-blue-700 mb-2" }, "Lumina Order or Line Item Link"),
+                                React.createElement('div', { className: "grid grid-cols-4 gap-2" },
+                                    React.createElement('div', { className: "col-span-3" },
+                                        React.createElement('input', {
+                                            type: "url",
+                                            value: orderLink,
+                                            onChange: (e) => {
+                                                setOrderLink(e.target.value);
+                                                setOrderError('');
+                                            },
+                                            placeholder: "https://townsquarelumina.com/lumina/view/order/... or lineitem/...",
+                                            className: "w-full px-3 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        })
+                                    ),
+                                    React.createElement('div', { className: "col-span-1" },
+                                        React.createElement('button', {
+                                            onClick: handleOrderImport,
+                                            disabled: !orderLink || orderLoading,
+                                            className: `w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors ${
+                                                (!orderLink || orderLoading) ? 'opacity-50 cursor-not-allowed' : ''
+                                            }`
+                                        }, orderLoading ? 'Loading...' : 'Import')
+                                    )
                                 ),
-                                React.createElement('div', { className: "flex items-end" },
-                                    React.createElement('button', {
-                                        onClick: handleOrderImport,
-                                        disabled: !orderLink || orderLoading,
-                                        className: `px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors ${
-                                            (!orderLink || orderLoading) ? 'opacity-50 cursor-not-allowed' : ''
-                                        }`
-                                    }, orderLoading ? 'Loading...' : 'Import Order')
-                                )
+                                orderError && React.createElement('p', { className: "text-red-600 text-sm mt-1" }, orderError)
                             )
                         ),
                         
                         React.createElement('div', { className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" },
                             // Tactic Selection
-                            React.createElement('div', { className: "relative md:col-span-2 lg:col-span-1" },
+                            React.createElement('div', { className: "relative md:col-span-2 lg:col-span-1", ref: tacticDropdownRef },
                                 React.createElement('label', { className: "block text-sm font-medium text-gray-700 mb-2" }, "Tactic *"),
                                 React.createElement('div', { className: "relative" },
                                     React.createElement('input', {
@@ -875,9 +1345,14 @@
                                         }`
                                     }),
                                     
-                                    showTacticDropdown && filteredTactics.length > 0 && React.createElement('div', {
+                                    showTacticDropdown && React.createElement('div', {
                                         className: "absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto"
-                                    }, filteredTactics.map((tactic, index) =>
+                                    }, 
+                                        tacticsLoading ? 
+                                            React.createElement('div', { className: "p-4 text-center text-gray-500" }, "Loading tactics...") :
+                                        filteredTactics.length === 0 ? 
+                                            React.createElement('div', { className: "p-4 text-center text-gray-500" }, "No matching tactics found") :
+                                        filteredTactics.map((tactic, index) =>
                                         React.createElement('button', {
                                             key: index,
                                             onClick: () => handleTacticSelect(tactic),
@@ -993,28 +1468,9 @@
                             React.createElement('button', {
                                 onClick: () => generateFlightData(false),
                                 className: "px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
-                            }, "Generate Flight Plan"),
+                            }, "Generate Flight"),
                             
-                            React.createElement('button', {
-                                onClick: () => {
-                                    setFormData({
-                                        tactic: '',
-                                        startDate: '',
-                                        endDate: '',
-                                        totalBudget: '',
-                                        totalImpressions: '',
-                                        totalViews: '',
-                                        rate: '',
-                                        metricType: 'CPM'
-                                    });
-                                    setSearchTerm('');
-                                    setValidationErrors({});
-                                    setValidationAlert(null);
-                                },
-                                className: "px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
-                            }, "Clear"),
-
-                            React.createElement('button', {
+                            campaigns.length > 0 && React.createElement('button', {
                                 onClick: () => {
                                     setFormData({
                                         tactic: '',
@@ -1035,7 +1491,26 @@
                                     setShowDetailedView(null);
                                 },
                                 className: "px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-colors"
-                            }, "Start Over")
+                            }, "Start Over"),
+
+                            campaigns.length > 0 && React.createElement('button', {
+                                onClick: () => {
+                                    setFormData({
+                                        tactic: '',
+                                        startDate: '',
+                                        endDate: '',
+                                        totalBudget: '',
+                                        totalImpressions: '',
+                                        totalViews: '',
+                                        rate: '',
+                                        metricType: 'CPM'
+                                    });
+                                    setSearchTerm('');
+                                    setValidationErrors({});
+                                    setValidationAlert(null);
+                                },
+                                className: "px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+                            }, "Clear")
                         )
                     ),
 
@@ -1067,11 +1542,43 @@
                         campaigns[activeTab] && React.createElement('div', { className: "p-6" },
                             // Campaign Actions
                             React.createElement('div', { className: "mb-6 flex justify-between items-center" },
-                                React.createElement('h3', { className: "text-lg font-semibold text-gray-900" }, 
-                                    `${campaigns[activeTab].name} Flight Plan`
-                                ),
+                                editingCampaignName === activeTab ? 
+                                    React.createElement('div', { className: "flex items-center space-x-2" },
+                                        React.createElement('input', {
+                                            type: "text",
+                                            defaultValue: campaigns[activeTab].name,
+                                            onKeyDown: (e) => {
+                                                if (e.key === 'Enter') {
+                                                    updateCampaignName(activeTab, e.target.value);
+                                                    setEditingCampaignName(null);
+                                                } else if (e.key === 'Escape') {
+                                                    setEditingCampaignName(null);
+                                                }
+                                            },
+                                            onBlur: (e) => {
+                                                updateCampaignName(activeTab, e.target.value);
+                                                setEditingCampaignName(null);
+                                            },
+                                            className: "text-lg font-semibold text-gray-900 border-b-2 border-blue-500 bg-transparent focus:outline-none",
+                                            autoFocus: true
+                                        }),
+                                        React.createElement('span', { className: "text-sm text-gray-500" }, "Flight Plan")
+                                    ) :
+                                    React.createElement('div', { className: "flex items-center space-x-2 cursor-pointer", onClick: () => setEditingCampaignName(activeTab) },
+                                        React.createElement('h3', { className: "text-lg font-semibold text-gray-900" }, 
+                                            `${campaigns[activeTab].name} Flight Plan`
+                                        ),
+                                        React.createElement('svg', { className: "w-4 h-4 text-gray-400 hover:text-gray-600", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24" },
+                                            React.createElement('path', { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: "2", d: "M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" })
+                                        )
+                                    ),
                                 
                                 React.createElement('div', { className: "flex space-x-2" },
+                                    React.createElement('button', {
+                                        onClick: () => setShowViewAllModal(true),
+                                        className: "px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                                    }, "View All"),
+                                    
                                     React.createElement('button', {
                                         onClick: () => setShowForm(true),
                                         className: "px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
@@ -1085,11 +1592,20 @@
                             ),
 
                             // Budget Summary
-                            React.createElement('div', { className: "mb-6 grid grid-cols-3 gap-4" },
+                            React.createElement('div', { 
+                                className: campaigns[activeTab].templateType === 'programmatic' ? "mb-6 grid grid-cols-4 gap-4" : "mb-6 grid grid-cols-3 gap-4" 
+                            },
                                 React.createElement('div', { className: "bg-blue-50 rounded-lg p-4" },
                                     React.createElement('div', { className: "text-sm font-medium text-blue-600" }, "Total Budget"),
                                     React.createElement('div', { className: "text-2xl font-bold text-blue-900" },
                                         `$${campaigns[activeTab].flights.reduce((sum, flight) => sum + flight.budget, 0).toLocaleString()}`
+                                    )
+                                ),
+                                
+                                campaigns[activeTab].templateType === 'programmatic' && React.createElement('div', { className: "bg-orange-50 rounded-lg p-4" },
+                                    React.createElement('div', { className: "text-sm font-medium text-orange-600" }, "Total Impressions"),
+                                    React.createElement('div', { className: "text-2xl font-bold text-orange-900" },
+                                        campaigns[activeTab].flights.reduce((sum, flight) => sum + (flight.impressions || 0), 0).toLocaleString()
                                     )
                                 ),
                                 
@@ -1113,37 +1629,6 @@
                         )
                     ),
 
-                    // Detailed View Modal
-                    showDetailedView && React.createElement('div', { className: "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" },
-                        React.createElement('div', { className: "bg-white rounded-lg p-6 max-w-2xl w-full mx-4" },
-                            React.createElement('div', { className: "flex justify-between items-center mb-4" },
-                                React.createElement('h3', { className: "text-lg font-semibold text-gray-900" }, "Flight Details"),
-                                React.createElement('button', {
-                                    onClick: () => setShowDetailedView(null),
-                                    className: "text-gray-400 hover:text-gray-600 text-xl"
-                                }, "×")
-                            ),
-                            
-                            React.createElement('div', { className: "grid grid-cols-2 gap-4" },
-                                React.createElement('div', null,
-                                    React.createElement('label', { className: "block text-sm font-medium text-gray-700" }, "Line"),
-                                    React.createElement('p', { className: "text-lg text-gray-900" }, showDetailedView.flight.line)
-                                ),
-                                React.createElement('div', null,
-                                    React.createElement('label', { className: "block text-sm font-medium text-gray-700" }, "Budget"),
-                                    React.createElement('p', { className: "text-lg text-gray-900" }, `$${showDetailedView.flight.budget.toFixed(2)}`)
-                                ),
-                                React.createElement('div', null,
-                                    React.createElement('label', { className: "block text-sm font-medium text-gray-700" }, "Start Date"),
-                                    React.createElement('p', { className: "text-lg text-gray-900" }, formatDate(showDetailedView.flight.startDate))
-                                ),
-                                React.createElement('div', null,
-                                    React.createElement('label', { className: "block text-sm font-medium text-gray-700" }, "End Date"),
-                                    React.createElement('p', { className: "text-lg text-gray-900" }, formatDate(showDetailedView.flight.endDate))
-                                )
-                            )
-                        )
-                    ),
 
                     // Order Tactics Selection Modal
                     showOrderTactics && React.createElement('div', { className: "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" },
@@ -1262,6 +1747,82 @@
                                         selectedOrderTactics.length === 0 ? 'opacity-50 cursor-not-allowed' : ''
                                     }`
                                 }, `Generate ${selectedOrderTactics.length} Flight Plan(s)`)
+                            )
+                        )
+                    ),
+
+                    // View All Flight Plans Modal
+                    showViewAllModal && React.createElement('div', { className: "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" },
+                        React.createElement('div', { className: "bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto" },
+                            React.createElement('div', { className: "flex justify-between items-center mb-6" },
+                                React.createElement('h3', { className: "text-xl font-semibold text-gray-900" }, "All Flight Plans"),
+                                React.createElement('button', {
+                                    onClick: () => setShowViewAllModal(false),
+                                    className: "text-gray-400 hover:text-gray-600 text-2xl"
+                                }, "×")
+                            ),
+                            
+                            React.createElement('div', { className: "space-y-4" },
+                                campaigns.map((campaign, index) =>
+                                    React.createElement('div', { 
+                                        key: campaign.id, 
+                                        className: `p-4 border rounded-lg hover:bg-gray-50 ${activeTab === index ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}` 
+                                    },
+                                        React.createElement('div', { className: "flex justify-between items-center" },
+                                            React.createElement('div', { className: "flex items-center space-x-3" },
+                                                React.createElement('button', {
+                                                    onClick: () => {
+                                                        setActiveTab(index);
+                                                        setShowViewAllModal(false);
+                                                    },
+                                                    className: "text-lg font-semibold text-blue-600 hover:text-blue-800"
+                                                }, campaign.name),
+                                                React.createElement('span', { className: "text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded" },
+                                                    campaign.templateType.replace('-', ' / ')
+                                                )
+                                            ),
+                                            React.createElement('div', { className: "flex items-center space-x-2" },
+                                                React.createElement('button', {
+                                                    onClick: (e) => {
+                                                        e.stopPropagation();
+                                                        setEditingCampaignName(index);
+                                                        setShowViewAllModal(false);
+                                                        setActiveTab(index);
+                                                    },
+                                                    className: "p-1 text-gray-400 hover:text-blue-600",
+                                                    title: "Edit name"
+                                                },
+                                                    React.createElement('svg', { className: "w-4 h-4", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24" },
+                                                        React.createElement('path', { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: "2", d: "M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" })
+                                                    )
+                                                ),
+                                                React.createElement('button', {
+                                                    onClick: (e) => {
+                                                        e.stopPropagation();
+                                                        if (confirm(`Are you sure you want to delete "${campaign.name}"?`)) {
+                                                            deleteCampaign(index);
+                                                            if (campaigns.length <= 1) setShowViewAllModal(false);
+                                                        }
+                                                    },
+                                                    className: "p-1 text-gray-400 hover:text-red-600",
+                                                    title: "Delete campaign"
+                                                },
+                                                    React.createElement('svg', { className: "w-4 h-4", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24" },
+                                                        React.createElement('path', { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: "2", d: "M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" })
+                                                    )
+                                                )
+                                            )
+                                        ),
+                                        React.createElement('div', { className: "mt-2 flex justify-between text-sm text-gray-600" },
+                                            React.createElement('span', null, `${campaign.flights.length} flights`),
+                                            React.createElement('span', null, `$${campaign.flights.reduce((sum, flight) => sum + flight.budget, 0).toLocaleString()}`)
+                                        )
+                                    )
+                                )
+                            ),
+                            
+                            campaigns.length === 0 && React.createElement('div', { className: "text-center py-8 text-gray-500" },
+                                "No flight plans created yet."
                             )
                         )
                     ),

@@ -1,0 +1,27 @@
+{
+  "name": "flighting-docs",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start-export-server": "node excel-export-server.js",
+    "dev": "python3 -m http.server 8080"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/edwinlov3tt/flighting-docs.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/edwinlov3tt/flighting-docs/issues"
+  },
+  "homepage": "https://github.com/edwinlov3tt/flighting-docs#readme",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "xlsx": "^0.18.5"
+  }
+}
