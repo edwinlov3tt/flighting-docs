@@ -1,13 +1,23 @@
-// Excel Export Client Functions
+// Enhanced Excel Export Client Functions
 // This file should be included in index.html to enable Excel export functionality
+// Supports dynamic row generation with alternating colors and individual template files
 
-const EXCEL_EXPORT_SERVER = 'http://localhost:3001'; // Update this to your server URL
+// Use centralized configuration if available, fallback to localhost
+const EXCEL_EXPORT_SERVER = window.AppConfig?.EXCEL_EXPORT_URL || 'http://localhost:3002';
+console.log('Excel Export Server URL:', EXCEL_EXPORT_SERVER);
 
-// Export single campaign to Excel
+// Export single campaign to Excel with enhanced features
 async function exportCampaignToExcel(campaign) {
     try {
         // Show loading indicator
         showExportLoading(true);
+        
+        // Validate campaign data before sending
+        if (!campaign.templateType || !campaign.flights || !Array.isArray(campaign.flights)) {
+            throw new Error('Campaign must have templateType and flights array');
+        }
+        
+        console.log(`Exporting campaign: ${campaign.name} (${campaign.templateType}) with ${campaign.flights.length} flights`);
         
         const response = await fetch(`${EXCEL_EXPORT_SERVER}/api/export/single`, {
             method: 'POST',
@@ -26,20 +36,47 @@ async function exportCampaignToExcel(campaign) {
         if (result.success) {
             // Download the file
             downloadExcelFile(result.downloadUrl, result.fileName);
+            console.log(`Successfully exported: ${result.fileName}`);
+        } else {
+            throw new Error(result.message || 'Export failed');
         }
     } catch (error) {
         console.error('Export error:', error);
-        alert('Failed to export campaign. Please ensure the export server is running.');
+        let errorMessage = 'Failed to export campaign. ';
+        if (error.message.includes('templateType')) {
+            errorMessage += 'Invalid campaign data: missing template type or flights.';
+        } else if (error.message.includes('fetch')) {
+            errorMessage += 'Please ensure the export server is running on port 3002.';
+        } else {
+            errorMessage += error.message;
+        }
+        alert(errorMessage);
     } finally {
         showExportLoading(false);
     }
 }
 
-// Export multiple campaigns to Excel
+// Export multiple campaigns to Excel with enhanced features
 async function exportCampaignsToExcel(campaigns) {
     try {
         // Show loading indicator
         showExportLoading(true);
+        
+        // Validate campaigns data
+        if (!Array.isArray(campaigns) || campaigns.length === 0) {
+            throw new Error('Please provide an array of campaigns to export');
+        }
+        
+        const invalidCampaigns = campaigns.filter(c => 
+            !c.templateType || !c.flights || !Array.isArray(c.flights)
+        );
+        
+        if (invalidCampaigns.length > 0) {
+            throw new Error(`Invalid campaigns found: ${invalidCampaigns.map(c => c.name || 'Unknown').join(', ')}`);
+        }
+        
+        console.log(`Exporting ${campaigns.length} campaigns:`);
+        campaigns.forEach(c => console.log(`  - ${c.name} (${c.templateType}, ${c.flights.length} flights)`));
         
         const response = await fetch(`${EXCEL_EXPORT_SERVER}/api/export/bulk`, {
             method: 'POST',
@@ -58,10 +95,21 @@ async function exportCampaignsToExcel(campaigns) {
         if (result.success) {
             // Download the file
             downloadExcelFile(result.downloadUrl, result.fileName);
+            console.log(`Successfully exported: ${result.fileName}`);
+        } else {
+            throw new Error(result.message || 'Export failed');
         }
     } catch (error) {
         console.error('Export error:', error);
-        alert('Failed to export campaigns. Please ensure the export server is running.');
+        let errorMessage = 'Failed to export campaigns. ';
+        if (error.message.includes('Invalid campaigns')) {
+            errorMessage += error.message;
+        } else if (error.message.includes('fetch')) {
+            errorMessage += 'Please ensure the export server is running on port 3002.';
+        } else {
+            errorMessage += error.message;
+        }
+        alert(errorMessage);
     } finally {
         showExportLoading(false);
     }
@@ -75,6 +123,41 @@ function downloadExcelFile(downloadUrl, fileName) {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+}
+
+// Check if export server is running and get template information
+async function checkExportServerHealth() {
+    try {
+        console.log('Checking server health at:', `${EXCEL_EXPORT_SERVER}/health`);
+        const response = await fetch(`${EXCEL_EXPORT_SERVER}/health`);
+        console.log('Health check response status:', response.status);
+
+        if (response.ok) {
+            const data = await response.json();
+            console.log('Export server status:', data);
+            return data;
+        }
+        throw new Error('Server not responding');
+    } catch (error) {
+        console.error('Export server health check failed:', error);
+        return null;
+    }
+}
+
+// Get available templates and their fillable ranges
+async function getTemplateInfo() {
+    try {
+        const response = await fetch(`${EXCEL_EXPORT_SERVER}/api/templates/info`);
+        if (response.ok) {
+            const data = await response.json();
+            console.log('Available templates:', data);
+            return data;
+        }
+        throw new Error('Failed to get template info');
+    } catch (error) {
+        console.error('Failed to get template information:', error);
+        return null;
+    }
 }
 
 // Show/hide loading indicator
@@ -317,4 +400,26 @@ function addExcelExportButtons() {
     };
 }
 
-console.log('Excel export client loaded. Start the export server with: node excel-export-server.js');
+// Initialize export client
+async function initializeExportClient() {
+    console.log('Excel export client loaded. Checking server health...');
+    const serverHealth = await checkExportServerHealth();
+    if (serverHealth) {
+        console.log('✅ Export server is running and ready');
+        const templateInfo = await getTemplateInfo();
+        if (templateInfo) {
+            console.log('📋 Available templates:', templateInfo.supportedTypes);
+            console.log('📊 Fillable ranges:', templateInfo.fillableRanges);
+        }
+    } else {
+        console.warn('⚠️ Export server is not running. Start with: node excel-export-server.js');
+    }
+}
+
+// Auto-initialize when script loads
+if (typeof window !== 'undefined') {
+    // Delay initialization to allow other scripts to load
+    setTimeout(initializeExportClient, 1000);
+}
+
+console.log('Excel export client loaded. Server running on port 3002');

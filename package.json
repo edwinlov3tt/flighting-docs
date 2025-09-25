@@ -6,7 +6,11 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start-export-server": "node excel-export-server.js",
-    "dev": "python3 -m http.server 8080"
+    "start-enhanced-export": "node excel-export-server-enhanced.js",
+    "start-corrected-export": "node excel-export-server-simple.js",
+    "dev": "python3 -m http.server 8080",
+    "dev-with-export": "concurrently \"npm run dev\" \"npm run start-enhanced-export\"",
+    "analyze-templates": "node analyze-excel.js"
   },
   "repository": {
     "type": "git",
@@ -22,6 +26,11 @@
   "dependencies": {
     "cors": "^2.8.5",
     "express": "^5.1.0",
-    "xlsx": "^0.18.5"
+    "node-fetch": "^2.7.0",
+    "xlsx": "^0.18.5",
+    "xlsx-populate": "^1.21.0"
+  },
+  "devDependencies": {
+    "concurrently": "^7.6.0"
   }
 }
