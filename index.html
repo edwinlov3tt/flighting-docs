@@ -683,9 +683,48 @@
                     const budgetPerMonth = tactic.totalBudget / months.length;
                     
                     const flightData = months.map((month, index) => {
-                        const startDate = new Date(month.getFullYear(), month.getMonth(), 1);
-                        const endDate = new Date(month.getFullYear(), month.getMonth() + 1, 0);
-                        
+                        // For Lumina imports: preserve original start date for first flight, use month start for others
+                        let startDate, endDate;
+
+                        if (index === 0) {
+                            // First flight: use original Lumina start date (timezone-safe parsing)
+                            if (typeof tactic.startDate === 'string') {
+                                if (tactic.startDate.includes('T') || tactic.startDate.includes('Z')) {
+                                    const datePart = tactic.startDate.split('T')[0];
+                                    const [year, monthNum, day] = datePart.split('-').map(Number);
+                                    startDate = new Date(year, monthNum - 1, day);
+                                } else {
+                                    const [year, monthNum, day] = tactic.startDate.split('-').map(Number);
+                                    startDate = new Date(year, monthNum - 1, day);
+                                }
+                            } else {
+                                startDate = new Date(tactic.startDate);
+                            }
+                        } else {
+                            // Subsequent flights: use first of month
+                            startDate = new Date(month.getFullYear(), month.getMonth(), 1);
+                        }
+
+                        // End date logic: check if this is the last month
+                        if (index === months.length - 1) {
+                            // Last flight: use original Lumina end date (timezone-safe parsing)
+                            if (typeof tactic.endDate === 'string') {
+                                if (tactic.endDate.includes('T') || tactic.endDate.includes('Z')) {
+                                    const datePart = tactic.endDate.split('T')[0];
+                                    const [year, monthNum, day] = datePart.split('-').map(Number);
+                                    endDate = new Date(year, monthNum - 1, day);
+                                } else {
+                                    const [year, monthNum, day] = tactic.endDate.split('-').map(Number);
+                                    endDate = new Date(year, monthNum - 1, day);
+                                }
+                            } else {
+                                endDate = new Date(tactic.endDate);
+                            }
+                        } else {
+                            // Other flights: use last day of month
+                            endDate = new Date(month.getFullYear(), month.getMonth() + 1, 0);
+                        }
+
                         const flight = {
                             id: Date.now() + index + Math.random(),
                             line: index + 1,
