@@ -18,8 +18,8 @@ async function exportCampaignToExcel(campaign) {
         }
         
         console.log(`Exporting campaign: ${campaign.name} (${campaign.templateType}) with ${campaign.flights.length} flights`);
-        
-        const response = await fetch(`${EXCEL_EXPORT_SERVER}/api/export/single`, {
+
+        const response = await fetch(`${EXCEL_EXPORT_SERVER}?endpoint=single`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -31,14 +31,39 @@ async function exportCampaignToExcel(campaign) {
             throw new Error('Export failed');
         }
 
-        const result = await response.json();
-        
-        if (result.success) {
-            // Download the file
-            downloadExcelFile(result.downloadUrl, result.fileName);
-            console.log(`Successfully exported: ${result.fileName}`);
+        // Check if response is Excel file (from serverless function) or JSON (from local server)
+        const contentType = response.headers.get('content-type');
+
+        if (contentType && contentType.includes('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')) {
+            // Direct Excel file download from serverless function
+            const blob = await response.blob();
+            const contentDisposition = response.headers.get('content-disposition');
+            const fileName = contentDisposition ?
+                contentDisposition.split('filename=')[1]?.replace(/"/g, '') :
+                `${campaign.name.replace(/[^\w\s-]/g, '').trim()}.xlsx`;
+
+            // Create download link
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+
+            console.log(`Successfully exported: ${fileName}`);
         } else {
-            throw new Error(result.message || 'Export failed');
+            // JSON response from local server
+            const result = await response.json();
+
+            if (result.success) {
+                // Download the file
+                downloadExcelFile(result.downloadUrl, result.fileName);
+                console.log(`Successfully exported: ${result.fileName}`);
+            } else {
+                throw new Error(result.message || 'Export failed');
+            }
         }
     } catch (error) {
         console.error('Export error:', error);
@@ -78,7 +103,7 @@ async function exportCampaignsToExcel(campaigns) {
         console.log(`Exporting ${campaigns.length} campaigns:`);
         campaigns.forEach(c => console.log(`  - ${c.name} (${c.templateType}, ${c.flights.length} flights)`));
         
-        const response = await fetch(`${EXCEL_EXPORT_SERVER}/api/export/bulk`, {
+        const response = await fetch(`${EXCEL_EXPORT_SERVER}?endpoint=bulk`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -128,8 +153,8 @@ function downloadExcelFile(downloadUrl, fileName) {
 // Check if export server is running and get template information
 async function checkExportServerHealth() {
     try {
-        console.log('Checking server health at:', `${EXCEL_EXPORT_SERVER}/health`);
-        const response = await fetch(`${EXCEL_EXPORT_SERVER}/health`);
+        console.log('Checking server health at:', `${EXCEL_EXPORT_SERVER}?endpoint=health`);
+        const response = await fetch(`${EXCEL_EXPORT_SERVER}?endpoint=health`);
         console.log('Health check response status:', response.status);
 
         if (response.ok) {
