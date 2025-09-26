@@ -6,11 +6,13 @@ const fs = require('fs');
 // Excel Exporter class (simplified for serverless)
 class ExcelExporter {
     constructor() {
+        // In serverless environment, files are in /var/task
+        const basePath = process.env.VERCEL ? '/var/task' : process.cwd();
         this.templates = {
-            'programmatic': './templates/Programmatic Budget Flighting Template.xlsx',
-            'youtube': './templates/YouTube Budget Flighting Template.xlsx',
-            'sem-social': './templates/SEM_Social Budget Flighting Template.xlsx',
-            'default': './templates/Full Budget Flighting Template.xlsx'
+            'programmatic': path.join(basePath, 'templates/Programmatic Budget Flighting Template.xlsx'),
+            'youtube': path.join(basePath, 'templates/YouTube Budget Flighting Template.xlsx'),
+            'sem-social': path.join(basePath, 'templates/SEM_Social Budget Flighting Template.xlsx'),
+            'default': path.join(basePath, 'templates/Full Budget Flighting Template.xlsx')
         };
     }
 
@@ -47,13 +49,12 @@ class ExcelExporter {
 
     async loadTemplateWithPopulate(templateType) {
         const templatePath = this.templates[templateType] || this.templates['default'];
-        const fullPath = path.join(process.cwd(), templatePath);
 
-        if (!fs.existsSync(fullPath)) {
-            throw new Error(`Template file not found: ${fullPath}`);
+        if (!fs.existsSync(templatePath)) {
+            throw new Error(`Template file not found: ${templatePath}`);
         }
 
-        return await XlsxPopulate.fromFileAsync(fullPath);
+        return await XlsxPopulate.fromFileAsync(templatePath);
     }
 
     mapProgrammaticData(campaign) {
@@ -201,14 +202,14 @@ export default async function handler(req, res) {
         return;
     }
 
-    if (req.method !== 'POST') {
+    if (req.method !== 'POST' && req.method !== 'GET') {
         return res.status(405).json({ error: 'Method not allowed' });
     }
 
-    const { url } = req;
+    const { url, query } = req;
 
     try {
-        if (url.includes('/api/export/single')) {
+        if (url.includes('/api/excel-export') && (query.endpoint === 'single' || url.includes('single'))) {
             const { campaign } = req.body;
 
             if (!campaign) {
@@ -223,7 +224,7 @@ export default async function handler(req, res) {
             res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
             res.send(buffer);
 
-        } else if (url.includes('/health')) {
+        } else if (query.endpoint === 'health' || url.includes('/health')) {
             res.json({ status: 'OK', message: 'Excel export server is running' });
         } else {
             res.status(404).json({ error: 'Endpoint not found' });
