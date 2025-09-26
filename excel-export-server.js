@@ -253,8 +253,9 @@ class ExcelExporter {
 
         return {
             header: {
-                // SEM/Social template mapping - header fields removed as per new requirements
-                // Flight data will be the primary data source
+                'C3': this.dateToExcel(campaign.formData.startDate),  // Flight Start
+                'C4': this.dateToExcel(campaign.formData.endDate),    // Flight End
+                'C5': totalBudget                                     // Total Budget
             },
             flights: campaign.flights.map((flight, index) => ({
                 row: 12 + index,  // Flight data starts at B12:D49

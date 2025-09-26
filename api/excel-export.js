@@ -113,8 +113,14 @@ class ExcelExporter {
     }
 
     mapSEMSocialData(campaign) {
+        const totalBudget = campaign.flights.reduce((sum, f) => sum + f.budget, 0);
+
         return {
-            header: {},
+            header: {
+                'C3': this.dateToExcel(campaign.formData.startDate),  // Flight Start
+                'C4': this.dateToExcel(campaign.formData.endDate),    // Flight End
+                'C5': totalBudget                                     // Total Budget
+            },
             flights: campaign.flights.map((flight, index) => ({
                 row: 12 + index,
                 data: {
