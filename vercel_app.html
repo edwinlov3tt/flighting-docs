@@ -253,7 +253,7 @@
                     setTacticsError('');
                     
                     try {
-                        const response = await fetch(`${window.AppConfig.TACTICS_API_URL}?action=get_tactics`);
+                        const response = await fetch('https://ignite.edwinlovett.com/kpi/api.php?action=get_tactics');
                         if (!response.ok) {
                             throw new Error(`Failed to fetch tactics: ${response.status}`);
                         }

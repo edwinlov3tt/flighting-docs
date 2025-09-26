@@ -13,7 +13,7 @@ const CONFIG = {
     production: {
         APP_URL: '', // Will be auto-detected from window.location
         EXCEL_EXPORT_URL: '/api/excel-export', // Vercel serverless function
-        TACTICS_API_URL: 'https://ignite.edwinlovett.com/kpi/api.php'
+        TACTICS_API_URL: '/api/kpi-proxy' // CORS proxy for KPI data
     }
 };
 
