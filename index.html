@@ -1723,22 +1723,37 @@
                 const totals = calculateTotals(campaign.flights, campaign.templateType);
                 
                 if (campaign.templateType === 'sem-social') {
-                    return React.createElement('div', { className: "overflow-x-auto" },
-                        React.createElement('table', { className: "w-full border-collapse" },
-                            React.createElement('thead', null,
-                                React.createElement('tr', { className: "bg-gray-50" },
-                                    React.createElement('th', { className: "border border-gray-200 px-4 py-3 text-left text-sm font-medium text-gray-900" }, "Line"),
-                                    React.createElement('th', { className: "border border-gray-200 px-4 py-3 text-left text-sm font-medium text-gray-900" }, "Start Date"),
-                                    React.createElement('th', { className: "border border-gray-200 px-4 py-3 text-left text-sm font-medium text-gray-900" }, "End Date"),
-                                    React.createElement('th', { className: "border border-gray-200 px-4 py-3 text-left text-sm font-medium text-gray-900" }, "Budget"),
-                                    React.createElement('th', { className: "border border-gray-200 px-4 py-3 text-left text-sm font-medium text-gray-900" }, "Actions")
+                    return React.createElement('div', { className: "card overflow-hidden" },
+                        React.createElement('div', { className: "px-6 py-4 border-b border-[var(--border)] flex items-center justify-between" },
+                            React.createElement('h2', { className: "h2" }, `${campaign.name} – SEM / Social Flight Plan`),
+                            React.createElement('div', { className: "flex gap-2" },
+                                React.createElement('button', { className: "btn-ghost" }, "Compact"),
+                                React.createElement('button', { className: "btn-primary" }, "Export Excel")
+                            )
+                        ),
+                        React.createElement('div', { className: "overflow-auto" },
+                            React.createElement('table', { className: "w-full text-[15px]" },
+                                React.createElement('colgroup', null,
+                                    React.createElement('col', { className: "w-[72px]" }),
+                                    React.createElement('col', { className: "w-[160px]" }),
+                                    React.createElement('col', { className: "w-[160px]" }),
+                                    React.createElement('col', { className: "w-[180px]" }),
+                                    React.createElement('col', { className: "w-[240px]" })
+                                ),
+                                React.createElement('thead', { className: "bg-[#F5F7FA] sticky top-16 z-10" },
+                                    React.createElement('tr', { className: "[&>th]:text-left [&>th]:font-medium [&>th]:text-[#555] [&>th]:py-3 [&>th]:px-6" },
+                                    React.createElement('th', null, "Line"),
+                                    React.createElement('th', null, "Start Date"),
+                                    React.createElement('th', null, "End Date"),
+                                    React.createElement('th', null, "Budget"),
+                                    React.createElement('th', { className: "text-right" }, "Actions")
                                 )
                             ),
-                            React.createElement('tbody', null,
+                            React.createElement('tbody', { className: "[&>tr:nth-child(even)]:bg-[#FAFBFC]" },
                                 getVisibleFlights(campaign.flights).map((flight) =>
                                     React.createElement('tr', {
                                         key: flight.id,
-                                        className: `hover:bg-gray-50 ${flight.isChild ? 'bg-gray-50' : ''}`
+                                        className: `[&>td]:px-6 [&>td]:py-3 hover:bg-gray-50 ${flight.isChild ? 'bg-gray-50' : ''}`
                                     },
                                         React.createElement('td', {
                                             className: `border border-gray-200 px-4 py-3 text-sm text-gray-900 text-center ${
@@ -2069,7 +2084,7 @@
 
             return React.createElement('div', {
                 className: `min-h-screen ${compactMode ? 'density-compact' : ''}`,
-                style: { paddingTop: '80px', paddingBottom: campaigns.length > 0 ? '120px' : '24px' }
+                style: { paddingBottom: campaigns.length > 0 ? '120px' : '24px' }
             },
                 // Sticky Header
                 React.createElement('header', { className: "sticky-header" },
@@ -2077,21 +2092,20 @@
                         React.createElement('h1', { className: "h1" }, "Media Flight Planning"),
                         React.createElement('div', { className: "flex items-center gap-3" },
                             React.createElement('button', {
-                                onClick: () => setCompactMode(!compactMode),
-                                className: `px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-                                    compactMode
-                                        ? 'bg-gray-900 text-white'
-                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                }`,
+                                onClick: () => {
+                                    setCompactMode(!compactMode);
+                                    document.body.classList.toggle('density-compact');
+                                },
+                                className: "btn-ghost",
                                 title: compactMode ? "Switch to comfortable view" : "Switch to compact view"
                             }, compactMode ? "Comfortable" : "Compact"),
                             campaigns.length > 0 && React.createElement('button', {
                                 onClick: () => setShowViewAllModal(true),
-                                className: "btn-secondary text-sm"
+                                className: "btn-ghost"
                             }, "View All"),
                             campaigns.length > 0 && React.createElement('button', {
                                 onClick: () => window.ExcelExportFeatures && window.exportCampaignsToExcel ? window.exportCampaignsToExcel(campaigns) : alert('Excel export not available'),
-                                className: "btn-primary text-sm"
+                                className: "btn-primary"
                             }, "Export Excel")
                         )
                     )
@@ -2489,40 +2503,47 @@
                                 )
                             ),
 
-                            // Stats Strip
-                            React.createElement('section', { className: "grid gap-4 md:grid-cols-4 mb-8" },
-                                React.createElement('article', { className: "card" },
-                                    React.createElement('div', { className: "meta mb-1" }, "Total Budget"),
-                                    React.createElement('div', { className: "text-[28px] font-bold", style: { color: 'var(--text-h)' } },
+                            // Premium KPI Cards
+                            React.createElement('section', { className: "mx-auto max-w-[1200px] px-6 py-6 grid gap-4 md:grid-cols-4" },
+                                React.createElement('article', { className: "card p-4 md:p-6" },
+                                    React.createElement('div', { className: "text-[13px] font-medium text-[var(--text-secondary)] mb-1" }, "Total Budget"),
+                                    React.createElement('div', { className: "text-[28px] md:text-[30px] font-bold text-black tracking-tight" },
                                         `$${campaigns[activeTab].flights.reduce((sum, flight) => sum + flight.budget, 0).toLocaleString()}`
                                     )
                                 ),
 
-                                campaigns[activeTab].templateType === 'programmatic' && React.createElement('article', { className: "card" },
-                                    React.createElement('div', { className: "meta mb-1" }, "Total Impressions"),
-                                    React.createElement('div', { className: "text-[28px] font-bold", style: { color: 'var(--text-h)' } },
+                                campaigns[activeTab].templateType === 'programmatic' && React.createElement('article', { className: "card p-4 md:p-6" },
+                                    React.createElement('div', { className: "text-[13px] font-medium text-[var(--text-secondary)] mb-1" }, "Total Impressions"),
+                                    React.createElement('div', { className: "text-[28px] md:text-[30px] font-bold text-black tracking-tight" },
                                         campaigns[activeTab].flights.reduce((sum, flight) => sum + (flight.impressions || 0), 0).toLocaleString()
                                     )
                                 ),
 
-                                campaigns[activeTab].templateType === 'youtube' && React.createElement('article', { className: "card" },
-                                    React.createElement('div', { className: "meta mb-1" }, "Total Views"),
-                                    React.createElement('div', { className: "text-[28px] font-bold", style: { color: 'var(--text-h)' } },
+                                campaigns[activeTab].templateType === 'youtube' && React.createElement('article', { className: "card p-4 md:p-6" },
+                                    React.createElement('div', { className: "text-[13px] font-medium text-[var(--text-secondary)] mb-1" }, "Total Views"),
+                                    React.createElement('div', { className: "text-[28px] md:text-[30px] font-bold text-black tracking-tight" },
                                         campaigns[activeTab].flights.reduce((sum, flight) => sum + (flight.totalViews || flight.views || 0), 0).toLocaleString()
                                     )
                                 ),
 
-                                React.createElement('article', { className: "card" },
-                                    React.createElement('div', { className: "meta mb-1" }, "Active Flights"),
-                                    React.createElement('div', { className: "text-[28px] font-bold", style: { color: 'var(--text-h)' } },
+                                React.createElement('article', { className: "card p-4 md:p-6" },
+                                    React.createElement('div', { className: "text-[13px] font-medium text-[var(--text-secondary)] mb-1" }, "Active Flights"),
+                                    React.createElement('div', { className: "text-[28px] md:text-[30px] font-bold text-black tracking-tight" },
                                         campaigns[activeTab].flights.filter(f => f.budget > 0).length
                                     )
                                 ),
 
-                                React.createElement('article', { className: "card" },
-                                    React.createElement('div', { className: "meta mb-1" }, "Template Type"),
-                                    React.createElement('div', { className: "text-[18px] font-semibold", style: { color: 'var(--text-h)' } },
-                                        campaigns[activeTab]?.templateType?.replace('-', ' / ') || 'Not Set'
+                                React.createElement('div', { className: "card p-4 md:p-6 flex items-center justify-between" },
+                                    React.createElement('div', null,
+                                        React.createElement('div', { className: "text-[13px] font-medium text-[var(--text-secondary)] mb-1" }, "Actions"),
+                                        React.createElement('div', { className: "text-[14px] text-[var(--text-secondary)]" }, "Export, View All")
+                                    ),
+                                    React.createElement('div', { className: "flex gap-2" },
+                                        React.createElement('button', { className: "btn-ghost", onClick: () => setShowViewAllModal(true) }, "View All"),
+                                        React.createElement('button', {
+                                            className: "btn-primary",
+                                            onClick: () => window.ExcelExportFeatures && window.exportCampaignsToExcel ? window.exportCampaignsToExcel([campaigns[activeTab]]) : alert('Excel export not available')
+                                        }, "Export Excel")
                                     )
                                 )
                             ),
