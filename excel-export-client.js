@@ -172,6 +172,16 @@ async function checkExportServerHealth() {
 // Get available templates and their fillable ranges
 async function getTemplateInfo() {
     try {
+        // For serverless deployment, template info is not available as an endpoint
+        // Return static info for the supported templates
+        if (EXCEL_EXPORT_SERVER.includes('/api/excel-export')) {
+            console.log('Using serverless deployment - template info not available via API');
+            return {
+                supportedTypes: ['programmatic', 'youtube', 'sem-social', 'default'],
+                message: 'Template info not available in serverless mode'
+            };
+        }
+
         const response = await fetch(`${EXCEL_EXPORT_SERVER}/api/templates/info`);
         if (response.ok) {
             const data = await response.json();

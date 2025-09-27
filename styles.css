@@ -1,0 +1,308 @@
+/* Media Flight Planner - Design System Tokens */
+/* Load after Tailwind for token overrides */
+
+:root {
+  /* Brand */
+  --brand-red: #ED4235;
+
+  /* Text system */
+  --text-h: #000000;
+  --text-body: #333333;
+  --text-secondary: #666666;
+
+  /* Surfaces */
+  --bg-canvas: #F7F8FA;     /* subtle warmth vs stark white */
+  --bg-surface: #FFFFFF;
+  --border: #E6E8EC;        /* slightly softer than #e5e7eb */
+
+  /* Components */
+  --btn-primary-bg: var(--brand-red);
+  --btn-primary-fg: #fff;
+  --btn-primary-hover: #C92D22;   /* darken 10–12% */
+  --btn-ring: 0 0 0 3px rgba(237,66,53,.18);
+
+  /* Ramps */
+  --radius-card: 14px;
+  --radius-btn: 10px;
+  --shadow-sm: 0 1px 3px rgba(15,23,42,.06);
+  --shadow-lg: 0 16px 40px rgba(2,6,23,.06);
+
+  /* Type scale */
+  --h1: 34px; --h1-line: 1.2; --h1-w: 700;
+  --h2: 22px; --h2-line: 1.35; --h2-w: 600;
+  --body: 16px; --body-line: 1.6; --body-w: 400;
+  --meta: 13px; --meta-line: 1.5; --meta-w: 500;
+}
+
+/* Global font features for tabular numbers */
+html {
+  font-feature-settings: "tnum" 1, "lnum" 1;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+body {
+  background: var(--bg-canvas);
+  color: var(--text-body);
+}
+
+/* Typography utilities */
+.h1 {
+  font-size: var(--h1);
+  line-height: var(--h1-line);
+  font-weight: var(--h1-w);
+  color: var(--text-h);
+}
+
+.h2 {
+  font-size: var(--h2);
+  line-height: var(--h2-line);
+  font-weight: var(--h2-w);
+  color: var(--text-h);
+}
+
+.meta {
+  font-size: var(--meta);
+  line-height: var(--meta-line);
+  color: var(--text-secondary);
+}
+
+/* Button system */
+.btn-primary {
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-fg);
+  border-radius: var(--radius-btn);
+  padding: 12px 18px;
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+  transition: transform .15s ease, box-shadow .2s ease, background .15s ease;
+  border: none;
+  cursor: pointer;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-primary:hover {
+  background: var(--btn-primary-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-lg);
+}
+
+.btn-primary:focus-visible {
+  outline: none;
+  box-shadow: var(--btn-ring);
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--text-body);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-btn);
+  padding: 10px 16px;
+  font-weight: 500;
+  transition: border-color .15s ease, color .15s ease;
+  cursor: pointer;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-secondary:hover {
+  border-color: var(--brand-red);
+  color: var(--brand-red);
+}
+
+.btn-destructive {
+  background: transparent;
+  color: var(--brand-red);
+  border: 2px solid var(--brand-red);
+  border-radius: var(--radius-btn);
+  padding: 10px 16px;
+  font-weight: 500;
+  transition: background .15s ease, color .15s ease;
+  cursor: pointer;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-destructive:hover {
+  background: var(--brand-red);
+  color: white;
+}
+
+/* Card system */
+.card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-sm);
+  padding: 24px;
+}
+
+/* Input system */
+.input {
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: #fff;
+  font-size: var(--body);
+  transition: border-color .15s ease, box-shadow .15s ease;
+  min-height: 44px;
+  width: 100%;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--brand-red);
+  box-shadow: var(--btn-ring);
+}
+
+/* Table enhancements */
+.table-sticky-header thead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #F5F7FA;
+}
+
+.table-zebra tbody tr:nth-child(even) {
+  background: #FAFBFC;
+}
+
+.table-numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Status badges */
+.badge-balanced {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  background: #E8F5EE;
+  color: #176C47;
+  font-size: var(--meta);
+  font-weight: 500;
+}
+
+.badge-warning {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  background: #FEF3C7;
+  color: #92400E;
+  font-size: var(--meta);
+  font-weight: 500;
+}
+
+.badge-danger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  background: #FDECEA;
+  color: var(--brand-red);
+  font-size: var(--meta);
+  font-weight: 500;
+}
+
+/* Progress bar */
+.progress-bar {
+  height: 8px;
+  background: #E9EDF2;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--brand-red);
+  transition: width 0.3s ease;
+}
+
+/* Modal improvements */
+.modal-overlay {
+  background: rgba(15,23,42,.5);
+  backdrop-filter: blur(4px);
+}
+
+.modal-content {
+  background: var(--bg-surface);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-lg);
+  max-width: 90vw;
+  max-height: 90vh;
+  overflow: auto;
+}
+
+/* Compact mode */
+.density-compact .card {
+  padding: 16px;
+}
+
+.density-compact table th,
+.density-compact table td {
+  padding: 8px 12px;
+  line-height: 1.3;
+}
+
+.density-compact .btn-primary,
+.density-compact .btn-secondary,
+.density-compact .btn-destructive {
+  padding: 8px 12px;
+  min-height: 36px;
+}
+
+.density-compact .input {
+  padding: 8px 12px;
+  min-height: 36px;
+}
+
+/* Sticky header */
+.sticky-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  backdrop-filter: blur(12px);
+  background: rgba(255, 255, 255, 0.75);
+  border-bottom: 1px solid var(--border);
+}
+
+/* Animation utilities */
+.fade-in {
+  animation: fadeIn 0.2s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.slide-up {
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Focus management */
+.focus-ring:focus-visible {
+  outline: none;
+  box-shadow: var(--btn-ring);
+}
+
+/* Icon sizing */
+.icon-sm { width: 16px; height: 16px; }
+.icon-md { width: 20px; height: 20px; stroke-width: 1.75; }
+.icon-lg { width: 24px; height: 24px; }
