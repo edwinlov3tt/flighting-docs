@@ -198,70 +198,55 @@ class ExcelExporter {
         return await workbook.outputAsync();
     }
 
-    async copySheetContents(sourceSheet, targetSheet) {
-        // Copy all cell values and styles from source to target
-        const usedRange = sourceSheet.usedRange();
-        if (usedRange) {
-            const values = usedRange.value();
-            targetSheet.range(usedRange.address()).value(values);
+    async exportMultipleCampaigns(campaigns) {
+        // For multiple campaigns, we need to create separate workbook for each
+        // and combine them. xlsx-populate doesn't support easy sheet copying between workbooks.
 
-            // Copy styles cell by cell
-            const startRow = usedRange.startCell().rowNumber();
-            const endRow = usedRange.endCell().rowNumber();
-            const startCol = usedRange.startCell().columnNumber();
-            const endCol = usedRange.endCell().columnNumber();
+        // Process each campaign into its own workbook first
+        const workbookBuffers = [];
 
-            for (let row = startRow; row <= endRow; row++) {
-                for (let col = startCol; col <= endCol; col++) {
-                    const sourceCell = sourceSheet.row(row).cell(col);
-                    const targetCell = targetSheet.row(row).cell(col);
+        for (let i = 0; i < campaigns.length; i++) {
+            const campaign = campaigns[i];
+            const buffer = await this.exportSingleCampaignEnhanced(campaign);
+            workbookBuffers.push({
+                name: campaign.name.substring(0, 31).replace(/[\\\/\?\*\[\]]/g, '_'),
+                buffer: buffer
+            });
+        }
 
-                    // Copy style if it exists
-                    const style = sourceCell.style();
-                    if (style && Object.keys(style).length > 0) {
-                        targetCell.style(style);
-                    }
-                }
+        // Use XLSX library to combine all workbooks into one multi-sheet workbook
+        const combinedWorkbook = await XlsxPopulate.fromBlankAsync();
+
+        // Remove the default blank sheet
+        const defaultSheet = combinedWorkbook.sheet(0);
+
+        for (let i = 0; i < workbookBuffers.length; i++) {
+            const { name, buffer } = workbookBuffers[i];
+
+            // Load this campaign's workbook
+            const campaignWorkbook = await XlsxPopulate.fromDataAsync(buffer);
+            const sourceSheet = campaignWorkbook.sheet(0);
+
+            // Create or use sheet in combined workbook
+            let targetSheet;
+            if (i === 0) {
+                // Use the existing first sheet
+                targetSheet = defaultSheet;
+                targetSheet.name(name);
+            } else {
+                // Create a new sheet
+                targetSheet = combinedWorkbook.addSheet(name);
+            }
+
+            // Copy all data from source to target
+            const usedRange = sourceSheet.usedRange();
+            if (usedRange) {
+                const values = usedRange.value();
+                targetSheet.range(usedRange.address()).value(values);
             }
         }
-    }
 
-    async exportMultipleCampaigns(campaigns) {
-        // Start with a fresh template for the first campaign
-        let workbook = await this.loadTemplateWithPopulate(campaigns[0].templateType || 'default');
-        const firstSheet = workbook.sheet(0);
-
-        // Rename first sheet to first campaign name
-        const firstSheetName = campaigns[0].name.substring(0, 31).replace(/[\\\/\?\*\[\]]/g, '_');
-        firstSheet.name(firstSheetName);
-
-        // Apply first campaign data
-        await this.applyEnhancedMapping(firstSheet, campaigns[0], campaigns[0].templateType || 'programmatic');
-
-        // Process remaining campaigns by loading fresh templates and copying content
-        for (let i = 1; i < campaigns.length; i++) {
-            const campaign = campaigns[i];
-            const templateType = campaign.templateType || 'programmatic';
-
-            // Load a fresh template to get the template structure
-            const tempWorkbook = await this.loadTemplateWithPopulate(templateType);
-            const tempSheet = tempWorkbook.sheet(0);
-
-            // Create sanitized sheet name
-            const sheetName = campaign.name.substring(0, 31).replace(/[\\\/\?\*\[\]]/g, '_');
-
-            // Add a new blank sheet to the main workbook
-            const newSheet = workbook.addSheet(sheetName);
-
-            // Copy all template content to the new sheet
-            await this.copySheetContents(tempSheet, newSheet);
-
-            // Apply campaign data to the new sheet
-            await this.applyEnhancedMapping(newSheet, campaign, templateType);
-        }
-
-        // Return the workbook buffer
-        return await workbook.outputAsync();
+        return await combinedWorkbook.outputAsync();
     }
 }
 
