@@ -215,8 +215,8 @@ class ExcelExporter {
             const sanitizedName = campaign.name.replace(/[^a-zA-Z0-9-_ ]/g, '').trim();
             const fileName = `${sanitizedName}.xlsx`;
 
-            // Add to zip
-            zip.file(fileName, buffer);
+            // Add to zip - specify binary option to prevent corruption
+            zip.file(fileName, buffer, { binary: true });
         }
 
         // Generate the zip file as a buffer
