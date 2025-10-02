@@ -65,13 +65,13 @@ export function ViewAllModal({
           </button>
         </div>
 
-        {/* Export All Button */}
+        {/* Action Buttons */}
         {campaigns.length > 0 && (
-          <div className="mb-6">
+          <div className="mb-6 grid grid-cols-2 gap-3">
             <button
               onClick={onExportAll}
               disabled={exportLoading}
-              className={`w-full px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors ${
+              className={`px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors ${
                 exportLoading ? 'opacity-50 cursor-not-allowed' : ''
               }`}
             >
@@ -79,9 +79,30 @@ export function ViewAllModal({
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
-                <span>{exportLoading ? 'Exporting...' : `Export All ${campaigns.length} Flight Plans to Excel`}</span>
+                <span>{exportLoading ? 'Exporting...' : `Export All to Excel`}</span>
               </div>
             </button>
+
+            {/* Open All Lumina Links button - only show if any campaigns have Lumina URLs */}
+            {campaigns.some(c => c.luminaTactic?.luminaUrl) && (
+              <button
+                onClick={() => {
+                  const luminaUrls = campaigns
+                    .filter(c => c.luminaTactic?.luminaUrl)
+                    .map(c => c.luminaTactic.luminaUrl);
+
+                  luminaUrls.forEach(url => window.open(url, '_blank'));
+                }}
+                className="px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors"
+              >
+                <div className="flex items-center justify-center space-x-2">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                  <span>Open All in Lumina</span>
+                </div>
+              </button>
+            )}
           </div>
         )}
 

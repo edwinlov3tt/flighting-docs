@@ -68,9 +68,10 @@ export const processLuminaData = (luminaData) => {
   return lineItems.map((lineItem, index) => {
     const product = lineItem.product || '';
     const subProduct = lineItem.subProduct?.[0] || lineItem.subProduct || '';
+    const lineitemId = lineItem.lineitemId || `order-tactic-${index}`;
 
     return {
-      id: lineItem.lineitemId || `order-tactic-${index}`,
+      id: lineitemId,
       status: lineItem.status || '',
       startDate: lineItem.startDate ? formatDateForInput(lineItem.startDate) : '',
       endDate: lineItem.endDate ? formatDateForInput(lineItem.endDate) : '',
@@ -85,9 +86,20 @@ export const processLuminaData = (luminaData) => {
       displayName: lineItem.displayName || `${product} - ${subProduct}`,
       campaignInitiative: lineItem.campaignInitiative || '',
       nameType: 'displayName', // Default to displayName
+      luminaUrl: generateLuminaLineitemUrl(product, lineitemId),
       selected: true
     };
   }).filter(tactic => tactic.product && tactic.totalBudget > 0);
+};
+
+// Generate Lumina lineitem URL
+export const generateLuminaLineitemUrl = (product, lineitemId) => {
+  if (!product || !lineitemId) return null;
+
+  // Slugify the product name (lowercase, replace spaces with hyphens)
+  const productSlug = product.toLowerCase().replace(/\s+/g, '-');
+
+  return `https://townsquarelumina.com/lumina/view/lineitem/${productSlug}/${lineitemId}`;
 };
 
 // Determine template type from Lumina tactic
