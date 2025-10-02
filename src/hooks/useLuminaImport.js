@@ -77,6 +77,23 @@ export function useLuminaImport() {
     );
   };
 
+  // Update tactic name type
+  const updateTacticNameType = (tacticId, nameType) => {
+    setTactics(prev => prev.map(tactic =>
+      tactic.id === tacticId
+        ? { ...tactic, nameType }
+        : tactic
+    ));
+  };
+
+  // Get the effective name for a tactic based on its nameType
+  const getTacticName = (tactic) => {
+    const nameType = tactic.nameType || 'displayName';
+    return nameType === 'campaignInitiative' && tactic.campaignInitiative
+      ? tactic.campaignInitiative
+      : tactic.displayName;
+  };
+
   // Generate campaigns from selected tactics
   const generateCampaigns = () => {
     const selectedTactics = tactics.filter(tactic =>
@@ -136,13 +153,15 @@ export function useLuminaImport() {
         return flight;
       });
 
+      const tacticName = getTacticName(tactic);
+
       return {
         id: Date.now() + Math.random(),
-        name: tactic.displayName,
+        name: tacticName,
         templateType: templateType,
         flights: flightData,
         formData: {
-          tactic: tactic.displayName,
+          tactic: tacticName,
           startDate: tactic.startDate,
           endDate: tactic.endDate,
           totalBudget: tactic.totalBudget.toString(),
@@ -151,7 +170,8 @@ export function useLuminaImport() {
           rate: tactic.cpm.toString(),
           metricType: tactic.kpi
         },
-        originalFlights: JSON.parse(JSON.stringify(flightData))
+        originalFlights: JSON.parse(JSON.stringify(flightData)),
+        luminaTactic: tactic // Store original tactic data for later reference
       };
     });
 
@@ -177,6 +197,7 @@ export function useLuminaImport() {
     showTactics,
     handleImport,
     toggleTacticSelection,
+    updateTacticNameType,
     generateCampaigns,
     clearImport
   };

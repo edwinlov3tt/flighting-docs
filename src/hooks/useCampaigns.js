@@ -100,6 +100,15 @@ export function useCampaigns() {
     });
   };
 
+  // Update campaign (partial update)
+  const updateCampaign = (campaignIndex, updates) => {
+    setCampaignsWithHistory(prev => {
+      const updated = [...prev];
+      updated[campaignIndex] = { ...updated[campaignIndex], ...updates };
+      return updated;
+    });
+  };
+
   // Delete campaign
   const deleteCampaign = (campaignIndex) => {
     setCampaigns(prev => prev.filter((_, index) => index !== campaignIndex));
@@ -424,6 +433,7 @@ export function useCampaigns() {
   return {
     campaigns,
     addCampaign,
+    updateCampaign,
     updateCampaignName,
     deleteCampaign,
     updateFlightValue,

@@ -31,6 +31,7 @@ export default function App() {
   const {
     campaigns,
     addCampaign,
+    updateCampaign,
     updateCampaignName,
     deleteCampaign,
     updateFlightValue,
@@ -70,6 +71,7 @@ export default function App() {
     showTactics: showLuminaTactics,
     handleImport: handleLuminaImport,
     toggleTacticSelection,
+    updateTacticNameType,
     generateCampaigns: generateLuminaCampaigns,
     clearImport: clearLuminaImport
   } = useLuminaImport();
@@ -556,6 +558,32 @@ export default function App() {
                     >
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                     </svg>
+
+                    {/* Name Type Selector for Lumina Campaigns */}
+                    {activeCampaign.luminaTactic && (
+                      <select
+                        value={activeCampaign.luminaTactic.nameType || 'displayName'}
+                        onChange={(e) => {
+                          const newNameType = e.target.value;
+                          const newName = newNameType === 'campaignInitiative'
+                            ? activeCampaign.luminaTactic.campaignInitiative
+                            : activeCampaign.luminaTactic.displayName;
+                          updateCampaignName(activeTab, newName);
+                          // Update the nameType in luminaTactic
+                          updateCampaign(activeTab, {
+                            ...activeCampaign,
+                            luminaTactic: {
+                              ...activeCampaign.luminaTactic,
+                              nameType: newNameType
+                            }
+                          });
+                        }}
+                        className="ml-3 px-2 py-1 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="displayName">Display Name</option>
+                        <option value="campaignInitiative">Campaign Initiative</option>
+                      </select>
+                    )}
                   </>
                 )}
               </div>
@@ -748,6 +776,7 @@ export default function App() {
           tactics={luminaTactics}
           selectedIds={selectedTacticIds}
           onToggleSelect={toggleTacticSelection}
+          onUpdateNameType={updateTacticNameType}
           onGenerate={handleGenerateLuminaCampaigns}
           onClose={clearLuminaImport}
         />

@@ -13,7 +13,7 @@
  * - onClose: () => void - Close modal
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { formatCurrency } from '../../utils/formatters';
 
 export function LuminaTacticsModal({
@@ -22,11 +22,33 @@ export function LuminaTacticsModal({
   selectedIds = [],
   onToggleSelect,
   onGenerate,
-  onClose
+  onClose,
+  onUpdateNameType
 }) {
+  const [globalNameType, setGlobalNameType] = useState('displayName');
+
   if (!isOpen) return null;
 
   const isGenerateDisabled = selectedIds.length === 0;
+
+  // Handle global name type change
+  const handleGlobalNameTypeChange = (newType) => {
+    setGlobalNameType(newType);
+    // Update all tactics to use the new name type
+    tactics.forEach(tactic => {
+      if (onUpdateNameType) {
+        onUpdateNameType(tactic.id, newType);
+      }
+    });
+  };
+
+  // Get display name based on name type
+  const getDisplayName = (tactic) => {
+    const nameType = tactic.nameType || globalNameType;
+    return nameType === 'campaignInitiative' && tactic.campaignInitiative
+      ? tactic.campaignInitiative
+      : tactic.displayName;
+  };
 
   // Toggle all checkboxes
   const handleSelectAll = (checked) => {
@@ -67,6 +89,33 @@ export function LuminaTacticsModal({
         <p className="text-gray-600 mb-4">
           Found {tactics.length} tactic(s) in the order. Select which ones to generate flight plans for:
         </p>
+
+        {/* Name Type Toggle */}
+        <div className="mb-4 flex items-center space-x-4 p-3 bg-gray-50 rounded-lg">
+          <label className="text-sm font-medium text-gray-700">Display Name As:</label>
+          <div className="flex space-x-2">
+            <button
+              onClick={() => handleGlobalNameTypeChange('displayName')}
+              className={`px-4 py-2 text-sm rounded-lg transition-colors ${
+                globalNameType === 'displayName'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+              }`}
+            >
+              Display Name
+            </button>
+            <button
+              onClick={() => handleGlobalNameTypeChange('campaignInitiative')}
+              className={`px-4 py-2 text-sm rounded-lg transition-colors ${
+                globalNameType === 'campaignInitiative'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+              }`}
+            >
+              Campaign Initiative
+            </button>
+          </div>
+        </div>
 
         {/* Tactics Table */}
         {tactics.length > 0 && (
@@ -133,7 +182,7 @@ export function LuminaTacticsModal({
                       </span>
                     </td>
                     <td className="border border-gray-200 px-4 py-3 text-sm font-medium">
-                      <div>{tactic.displayName}</div>
+                      <div>{getDisplayName(tactic)}</div>
                       <div className="text-xs text-gray-500">
                         {tactic.product}{tactic.subProduct ? ` - ${tactic.subProduct}` : ''}
                       </div>

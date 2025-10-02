@@ -83,6 +83,8 @@ export const processLuminaData = (luminaData) => {
       cpm: lineItem.cpm || lineItem.cpmEmailDrop || 0,
       kpi: lineItem.kpi || 'CPM',
       displayName: lineItem.displayName || `${product} - ${subProduct}`,
+      campaignInitiative: lineItem.campaignInitiative || '',
+      nameType: 'displayName', // Default to displayName
       selected: true
     };
   }).filter(tactic => tactic.product && tactic.totalBudget > 0);
