@@ -10,8 +10,5 @@
       "maxDuration": 30,
       "memory": 1024
     }
-  },
-  "includeFiles": [
-    "templates/**"
-  ]
+  }
 }
