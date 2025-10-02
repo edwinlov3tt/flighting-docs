@@ -65,24 +65,24 @@ class ExcelExporter {
     mapProgrammaticData(campaign) {
         const totalBudget = campaign.flights.reduce((sum, f) => sum + f.budget, 0);
         const totalImpressions = campaign.flights.reduce((sum, f) => sum + (f.impressions || 0), 0);
+        const cpm = parseFloat(campaign.formData.rate) || 0;
 
         return {
             header: {
-                'C4': totalBudget,
-                'F3': this.dateToExcel(campaign.formData.startDate),
-                'F4': this.dateToExcel(campaign.formData.endDate),
-                'C5': totalImpressions,
-                'F5': 'Y'
+                'C4': totalBudget,                                     // Total Budget
+                'C5': totalImpressions,                                // Total Impressions
+                'C6': cpm,                                             // CPM
+                'F3': this.dateToExcel(campaign.formData.startDate),  // Flight Start
+                'F4': this.dateToExcel(campaign.formData.endDate)     // Flight End
             },
             flights: campaign.flights.map((flight, index) => ({
-                row: 13 + index,
+                row: 13 + index,  // Line Item Range starts at row 13
                 data: {
-                    'B': this.dateToExcel(flight.startDate),
-                    'C': this.dateToExcel(flight.endDate),
-                    'D': flight.budget,
-                    'E': flight.impressions || 0,
-                    'F': flight.trafficBudget || flight.budget * 1.01,
-                    'G': flight.trafficImpressions || 0
+                    'C': this.dateToExcel(flight.startDate),
+                    'D': this.dateToExcel(flight.endDate),
+                    'E': flight.budget,
+                    'F': flight.impressions || 0,
+                    'G': flight.trafficBudget || flight.budget * 1.01
                 }
             }))
         };
@@ -95,11 +95,11 @@ class ExcelExporter {
 
         return {
             header: {
-                'C4': totalBudget,
-                'C5': totalViews,
-                'F4': this.dateToExcel(campaign.formData.startDate),
-                'F5': this.dateToExcel(campaign.formData.endDate),
-                'C6': cpmcpv
+                'C4': totalBudget,                                     // Total Budget
+                'C5': totalViews,                                      // Impressions/Views
+                'C6': cpmcpv,                                          // CPM/CPV
+                'F4': this.dateToExcel(campaign.formData.startDate),  // Flight Start
+                'F5': this.dateToExcel(campaign.formData.endDate)     // Flight End
             },
             flights: campaign.flights.map((flight, index) => ({
                 row: 9 + index,
