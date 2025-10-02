@@ -78,11 +78,12 @@ class ExcelExporter {
             flights: campaign.flights.map((flight, index) => ({
                 row: 13 + index,  // Line Item Range starts at row 13
                 data: {
-                    'C': this.dateToExcel(flight.startDate),
-                    'D': this.dateToExcel(flight.endDate),
-                    'E': flight.budget,
-                    'F': flight.impressions || 0,
-                    'G': flight.trafficBudget || flight.budget * 1.01
+                    'B': this.dateToExcel(flight.startDate),         // Line Start Date
+                    'C': this.dateToExcel(flight.endDate),           // Line End Date
+                    'D': flight.budget,                              // Budget
+                    'E': flight.impressions || 0,                    // Impressions
+                    'F': flight.trafficBudget || flight.budget * 1.01,  // Traffic Budget
+                    'G': flight.trafficImpressions || 0              // Traffic Impressions
                 }
             }))
         };
@@ -196,6 +197,38 @@ class ExcelExporter {
         // Return the workbook buffer instead of saving to file
         return await workbook.outputAsync();
     }
+
+    async exportMultipleCampaigns(campaigns) {
+        // Load the Full Budget Flighting Template (multi-sheet template)
+        const workbook = await this.loadTemplateWithPopulate('default');
+
+        // Process each campaign
+        for (let i = 0; i < campaigns.length; i++) {
+            const campaign = campaigns[i];
+            const templateType = campaign.templateType || 'programmatic';
+
+            // For first campaign, use existing first sheet
+            let sheet;
+            if (i === 0) {
+                sheet = workbook.sheet(0);
+            } else {
+                // Clone the first sheet for additional campaigns
+                const firstSheet = workbook.sheet(0);
+                sheet = firstSheet.clone();
+                workbook.addSheet(sheet);
+            }
+
+            // Rename sheet to campaign name (sanitize for Excel)
+            const sheetName = campaign.name.substring(0, 31).replace(/[\\\/\?\*\[\]]/g, '_');
+            sheet.name(sheetName);
+
+            // Apply campaign data to the sheet
+            await this.applyEnhancedMapping(sheet, campaign, templateType);
+        }
+
+        // Return the workbook buffer
+        return await workbook.outputAsync();
+    }
 }
 
 // Initialize exporter
@@ -236,12 +269,10 @@ export default async function handler(req, res) {
             return res.send(buffer);
         }
 
-        // Multiple campaigns export - export each separately for now
+        // Multiple campaigns export - multi-sheet workbook
         if (campaigns && campaigns.length > 0) {
-            console.log('Exporting first campaign from multiple:', campaigns[0].name);
-            // For now, just export the first campaign
-            // TODO: Implement multi-sheet export
-            const buffer = await exporter.exportSingleCampaignEnhanced(campaigns[0]);
+            console.log(`Exporting ${campaigns.length} campaigns to multi-sheet workbook`);
+            const buffer = await exporter.exportMultipleCampaigns(campaigns);
             const fileName = 'Media_Flight_Plans.xlsx';
 
             res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
