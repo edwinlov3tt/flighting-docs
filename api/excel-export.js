@@ -1,5 +1,6 @@
 import XLSX from 'xlsx';
 import XlsxPopulate from 'xlsx-populate';
+import JSZip from 'jszip';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -199,54 +200,33 @@ class ExcelExporter {
     }
 
     async exportMultipleCampaigns(campaigns) {
-        // For multiple campaigns, we need to create separate workbook for each
-        // and combine them. xlsx-populate doesn't support easy sheet copying between workbooks.
+        // Export each campaign as a separate Excel file with full formatting
+        // Then combine into a ZIP file for download
 
-        // Process each campaign into its own workbook first
-        const workbookBuffers = [];
+        const zip = new JSZip();
 
         for (let i = 0; i < campaigns.length; i++) {
             const campaign = campaigns[i];
+
+            // Export this campaign with its proper template and formatting
             const buffer = await this.exportSingleCampaignEnhanced(campaign);
-            workbookBuffers.push({
-                name: campaign.name.substring(0, 31).replace(/[\\\/\?\*\[\]]/g, '_'),
-                buffer: buffer
-            });
+
+            // Sanitize filename for the zip
+            const sanitizedName = campaign.name.replace(/[^a-zA-Z0-9-_ ]/g, '').trim();
+            const fileName = `${sanitizedName}.xlsx`;
+
+            // Add to zip
+            zip.file(fileName, buffer);
         }
 
-        // Use XLSX library to combine all workbooks into one multi-sheet workbook
-        const combinedWorkbook = await XlsxPopulate.fromBlankAsync();
+        // Generate the zip file as a buffer
+        const zipBuffer = await zip.generateAsync({
+            type: 'nodebuffer',
+            compression: 'DEFLATE',
+            compressionOptions: { level: 6 }
+        });
 
-        // Remove the default blank sheet
-        const defaultSheet = combinedWorkbook.sheet(0);
-
-        for (let i = 0; i < workbookBuffers.length; i++) {
-            const { name, buffer } = workbookBuffers[i];
-
-            // Load this campaign's workbook
-            const campaignWorkbook = await XlsxPopulate.fromDataAsync(buffer);
-            const sourceSheet = campaignWorkbook.sheet(0);
-
-            // Create or use sheet in combined workbook
-            let targetSheet;
-            if (i === 0) {
-                // Use the existing first sheet
-                targetSheet = defaultSheet;
-                targetSheet.name(name);
-            } else {
-                // Create a new sheet
-                targetSheet = combinedWorkbook.addSheet(name);
-            }
-
-            // Copy all data from source to target
-            const usedRange = sourceSheet.usedRange();
-            if (usedRange) {
-                const values = usedRange.value();
-                targetSheet.range(usedRange.address()).value(values);
-            }
-        }
-
-        return await combinedWorkbook.outputAsync();
+        return zipBuffer;
     }
 }
 
@@ -288,15 +268,15 @@ export default async function handler(req, res) {
             return res.send(buffer);
         }
 
-        // Multiple campaigns export - multi-sheet workbook
+        // Multiple campaigns export - ZIP file with individual Excel files
         if (campaigns && campaigns.length > 0) {
-            console.log(`Exporting ${campaigns.length} campaigns to multi-sheet workbook`);
-            const buffer = await exporter.exportMultipleCampaigns(campaigns);
-            const fileName = 'Media_Flight_Plans.xlsx';
+            console.log(`Exporting ${campaigns.length} campaigns to ZIP file`);
+            const zipBuffer = await exporter.exportMultipleCampaigns(campaigns);
+            const fileName = 'Media_Flight_Plans.zip';
 
-            res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            res.setHeader('Content-Type', 'application/zip');
             res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
-            return res.send(buffer);
+            return res.send(zipBuffer);
         }
 
         return res.status(400).json({ error: 'Campaign or campaigns data required' });
