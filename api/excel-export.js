@@ -199,31 +199,35 @@ class ExcelExporter {
     }
 
     async exportMultipleCampaigns(campaigns) {
-        // Load the Full Budget Flighting Template (multi-sheet template)
-        const workbook = await this.loadTemplateWithPopulate('default');
+        // Start with a fresh template for the first campaign
+        let workbook = await this.loadTemplateWithPopulate(campaigns[0].templateType || 'default');
+        const firstSheet = workbook.sheet(0);
 
-        // Process each campaign
-        for (let i = 0; i < campaigns.length; i++) {
+        // Rename first sheet to first campaign name
+        const firstSheetName = campaigns[0].name.substring(0, 31).replace(/[\\\/\?\*\[\]]/g, '_');
+        firstSheet.name(firstSheetName);
+
+        // Apply first campaign data
+        await this.applyEnhancedMapping(firstSheet, campaigns[0], campaigns[0].templateType || 'programmatic');
+
+        // Process remaining campaigns by loading fresh templates and copying sheets
+        for (let i = 1; i < campaigns.length; i++) {
             const campaign = campaigns[i];
             const templateType = campaign.templateType || 'programmatic';
 
-            // For first campaign, use existing first sheet
-            let sheet;
-            if (i === 0) {
-                sheet = workbook.sheet(0);
-            } else {
-                // Clone the first sheet for additional campaigns
-                const firstSheet = workbook.sheet(0);
-                sheet = firstSheet.clone();
-                workbook.addSheet(sheet);
-            }
+            // Load a fresh template
+            const tempWorkbook = await this.loadTemplateWithPopulate(templateType);
+            const tempSheet = tempWorkbook.sheet(0);
 
-            // Rename sheet to campaign name (sanitize for Excel)
+            // Apply campaign data to temp sheet
+            await this.applyEnhancedMapping(tempSheet, campaign, templateType);
+
+            // Rename temp sheet to campaign name
             const sheetName = campaign.name.substring(0, 31).replace(/[\\\/\?\*\[\]]/g, '_');
-            sheet.name(sheetName);
+            tempSheet.name(sheetName);
 
-            // Apply campaign data to the sheet
-            await this.applyEnhancedMapping(sheet, campaign, templateType);
+            // Move sheet from temp workbook to main workbook
+            workbook.addSheet(tempSheet);
         }
 
         // Return the workbook buffer
