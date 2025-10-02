@@ -163,7 +163,10 @@ class ExcelExporter {
                     const cell = sheet.cell(cellAddress);
                     cell.value(value);
                 } catch (error) {
-                    console.warn(`Failed to set cell ${cellAddress}:`, error.message);
+                    // Silently skip invalid cells in production
+                    if (process.env.NODE_ENV === 'development') {
+                        console.warn(`Failed to set cell ${cellAddress}:`, error.message);
+                    }
                 }
             });
         }
@@ -177,7 +180,10 @@ class ExcelExporter {
                         const cell = sheet.cell(cellAddress);
                         cell.value(value);
                     } catch (error) {
-                        console.warn(`Failed to set flight cell ${col}${flight.row}:`, error.message);
+                        // Silently skip invalid cells in production
+                        if (process.env.NODE_ENV === 'development') {
+                            console.warn(`Failed to set flight cell ${col}${flight.row}:`, error.message);
+                        }
                     }
                 });
             });
@@ -208,33 +214,45 @@ class ExcelExporter {
         for (let i = 0; i < campaigns.length; i++) {
             const campaign = campaigns[i];
 
-            // Export this campaign with its proper template and formatting
-            const buffer = await this.exportSingleCampaignEnhanced(campaign);
+            try {
+                // Export this campaign with its proper template and formatting
+                const excelBuffer = await this.exportSingleCampaignEnhanced(campaign);
 
-            // Ensure buffer is a proper Buffer
-            const properBuffer = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
+                // xlsx-populate returns Uint8Array - convert to base64 for JSZip
+                let base64Data;
+                if (excelBuffer instanceof Uint8Array) {
+                    base64Data = Buffer.from(excelBuffer).toString('base64');
+                } else if (Buffer.isBuffer(excelBuffer)) {
+                    base64Data = excelBuffer.toString('base64');
+                } else {
+                    base64Data = Buffer.from(excelBuffer).toString('base64');
+                }
 
-            // Sanitize filename for the zip
-            const sanitizedName = campaign.name.replace(/[^a-zA-Z0-9-_ ]/g, '').trim();
-            const fileName = `${sanitizedName}.xlsx`;
+                // Sanitize filename for the zip
+                const sanitizedName = campaign.name.replace(/[^a-zA-Z0-9-_ ]/g, '').trim() || `Campaign_${i + 1}`;
+                const fileName = `${sanitizedName}.xlsx`;
 
-            console.log(`Adding ${fileName} to ZIP (${properBuffer.length} bytes)`);
+                // Add to zip using base64 encoding (most reliable for binary Excel files)
+                zip.file(fileName, base64Data, {
+                    base64: true,
+                    compression: 'DEFLATE',
+                    compressionOptions: { level: 6 }
+                });
 
-            // Add to zip as arraybuffer (more reliable for binary data)
-            zip.file(fileName, properBuffer, {
-                binary: true,
-                compression: 'STORE'
-            });
+            } catch (error) {
+                console.error(`Failed to export campaign ${campaign.name}:`, error.message);
+                throw new Error(`Failed to export campaign "${campaign.name}": ${error.message}`);
+            }
         }
 
         // Generate the zip file as a buffer
         const zipBuffer = await zip.generateAsync({
             type: 'nodebuffer',
-            compression: 'STORE',
+            compression: 'DEFLATE',
+            compressionOptions: { level: 6 },
             streamFiles: false
         });
 
-        console.log(`Generated ZIP file (${zipBuffer.length} bytes)`);
         return zipBuffer;
     }
 }
@@ -267,9 +285,8 @@ export default async function handler(req, res) {
 
         // Single campaign export
         if (campaign) {
-            console.log('Exporting single campaign:', campaign.name);
             const buffer = await exporter.exportSingleCampaignEnhanced(campaign);
-            const sanitizedCampaignName = campaign.name.replace(/[^\w\s-]/g, '').trim();
+            const sanitizedCampaignName = campaign.name.replace(/[^\w\s-]/g, '').trim() || 'Campaign';
             const fileName = `${sanitizedCampaignName}.xlsx`;
 
             res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -279,7 +296,6 @@ export default async function handler(req, res) {
 
         // Multiple campaigns export - ZIP file with individual Excel files
         if (campaigns && campaigns.length > 0) {
-            console.log(`Exporting ${campaigns.length} campaigns to ZIP file`);
             const zipBuffer = await exporter.exportMultipleCampaigns(campaigns);
             const fileName = 'Media_Flight_Plans.zip';
 
