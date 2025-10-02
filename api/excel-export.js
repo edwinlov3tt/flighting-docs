@@ -1,13 +1,18 @@
-const XLSX = require('xlsx');
-const XlsxPopulate = require('xlsx-populate');
-const path = require('path');
-const fs = require('fs');
+import XLSX from 'xlsx';
+import XlsxPopulate from 'xlsx-populate';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Excel Exporter class (simplified for serverless)
 class ExcelExporter {
     constructor() {
-        // In serverless environment, files are in /var/task
-        const basePath = process.env.VERCEL ? '/var/task' : process.cwd();
+        // In serverless environment on Vercel, templates are in /var/task/templates
+        // In local dev, they're relative to project root
+        const basePath = process.env.VERCEL ? '/var/task' : path.join(__dirname, '..');
         this.templates = {
             'programmatic': path.join(basePath, 'templates/Programmatic Budget Flighting Template.xlsx'),
             'youtube': path.join(basePath, 'templates/YouTube Budget Flighting Template.xlsx'),
