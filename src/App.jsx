@@ -21,6 +21,7 @@ import { EditCampaignModal } from './components/Modals/EditCampaignModal';
 import { BudgetStatusTracker } from './components/BudgetStatusTracker/BudgetStatusTracker';
 import { ExportLoadingOverlay } from './components/ExportLoadingOverlay/ExportLoadingOverlay';
 import { calculateTotals, calculateBudgetStatus } from './utils/calculations';
+import { exportCampaignToExcel, exportCampaignsToExcel } from './utils/excelExport';
 
 export default function App() {
   // Tactics data
@@ -247,25 +248,13 @@ export default function App() {
   // Handle Excel export
   const handleExportCampaign = async () => {
     if (!activeCampaign) return;
-
-    // Call the global exportCampaignToExcel function from excel-export-client.js
-    if (typeof window.exportCampaignToExcel === 'function') {
-      await window.exportCampaignToExcel(activeCampaign);
-    } else {
-      alert('Excel export client not loaded. Please ensure excel-export-client.js is included.');
-    }
+    await exportCampaignToExcel(activeCampaign, setExportLoading);
   };
 
   // Handle bulk Excel export
   const handleExportAllCampaigns = async () => {
     if (campaigns.length === 0) return;
-
-    // Call the global exportCampaignsToExcel function from excel-export-client.js
-    if (typeof window.exportCampaignsToExcel === 'function') {
-      await window.exportCampaignsToExcel(campaigns);
-    } else {
-      alert('Excel export client not loaded. Please ensure excel-export-client.js is included.');
-    }
+    await exportCampaignsToExcel(campaigns, setExportLoading);
   };
 
   // Handle Start Over - Reset everything
