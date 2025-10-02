@@ -2,8 +2,7 @@
 // This file should be included in index.html to enable Excel export functionality
 // Supports dynamic row generation with alternating colors and individual template files
 
-// Get export server URL from global config (set by Vite environment variables)
-const EXCEL_EXPORT_SERVER = window.APP_CONFIG?.EXPORT_API || 'http://localhost:3001';
+const EXCEL_EXPORT_SERVER = 'http://localhost:3001'; // Excel export server
 
 // Retry helper function with exponential backoff
 async function retryFetch(url, options, maxRetries = 3) {
@@ -48,31 +47,14 @@ async function exportCampaignToExcel(campaign) {
             throw new Error(errorData.message || `Export failed with status ${response.status}`);
         }
 
-        // Check if response is a file (serverless) or JSON (local server)
-        const contentType = response.headers.get('content-type');
-
-        if (contentType && contentType.includes('application/vnd.openxmlformats')) {
-            // Direct file download (serverless function)
-            const blob = await response.blob();
-            const fileName = `${campaign.name}.xlsx`;
-            const url = window.URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = fileName;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            window.URL.revokeObjectURL(url);
-            console.log(`Successfully exported: ${fileName}`);
+        const result = await response.json();
+        
+        if (result.success) {
+            // Download the file
+            downloadExcelFile(result.downloadUrl, result.fileName);
+            console.log(`Successfully exported: ${result.fileName}`);
         } else {
-            // JSON response (local server)
-            const result = await response.json();
-            if (result.success) {
-                downloadExcelFile(result.downloadUrl, result.fileName);
-                console.log(`Successfully exported: ${result.fileName}`);
-            } else {
-                throw new Error(result.message || 'Export failed');
-            }
+            throw new Error(result.message || 'Export failed');
         }
     } catch (error) {
         console.error('Export error:', error);
@@ -172,12 +154,6 @@ function downloadExcelFile(downloadUrl, fileName) {
 
 // Check if export server is running and get template information
 async function checkExportServerHealth() {
-    // Only check health in development (localhost)
-    if (!EXCEL_EXPORT_SERVER.includes('localhost')) {
-        console.log('Production mode - skipping health check');
-        return { status: 'production', message: 'Using serverless functions' };
-    }
-
     try {
         const response = await fetch(`${EXCEL_EXPORT_SERVER}/health`);
         if (response.ok) {
@@ -450,27 +426,24 @@ function addExcelExportButtons() {
 
 // Initialize export client
 async function initializeExportClient() {
-    console.log(`📊 Excel export client loaded. Server: ${EXCEL_EXPORT_SERVER}`);
-
+    console.log('Excel export client loaded. Checking server health...');
     const serverHealth = await checkExportServerHealth();
     if (serverHealth) {
-        if (serverHealth.status === 'production') {
-            console.log('✅ Production mode - using serverless functions');
-        } else {
-            console.log('✅ Export server is running and ready');
-            const templateInfo = await getTemplateInfo();
-            if (templateInfo) {
-                console.log('📋 Available templates:', templateInfo.supportedTypes);
-                console.log('📊 Fillable ranges:', templateInfo.fillableRanges);
-            }
+        console.log('✅ Export server is running and ready');
+        const templateInfo = await getTemplateInfo();
+        if (templateInfo) {
+            console.log('📋 Available templates:', templateInfo.supportedTypes);
+            console.log('📊 Fillable ranges:', templateInfo.fillableRanges);
         }
     } else {
-        console.warn('⚠️ Export server is not running. Start with: npm run start-export');
+        console.warn('⚠️ Export server is not running. Start with: node excel-export-server-enhanced.js');
     }
 }
 
 // Auto-initialize when script loads
 if (typeof window !== 'undefined') {
-    // Delay initialization to allow APP_CONFIG to be set
+    // Delay initialization to allow other scripts to load
     setTimeout(initializeExportClient, 1000);
 }
+
+console.log('Enhanced Excel export client loaded. Start the export server with: node excel-export-server-enhanced.js');

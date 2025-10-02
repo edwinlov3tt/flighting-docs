@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flight Table Component Test</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useMemo } = React;
+
+    // ============================================================================
+    // UTILITIES (from src/utils/)
+    // ============================================================================
+
+    // formatters.js
+    const formatDate = (dateString) => {
+      if (!dateString) return '';
+      let date;
+      if (dateString.includes('T') || dateString.includes('Z')) {
+        const datePart = dateString.split('T')[0];
+        const [year, month, day] = datePart.split('-').map(Number);
+        date = new Date(year, month - 1, day);
+      } else {
+        const [year, month, day] = dateString.split('-').map(Number);
+        date = new Date(year, month - 1, day);
+      }
+      return date.toLocaleDateString('en-US');
+    };
+
+    const formatCurrency = (value) => {
+      if (!value && value !== 0) return '$0.00';
+      return `$${parseFloat(value).toFixed(2)}`;
+    };
+
+    const formatNumber = (value) => {
+      if (!value && value !== 0) return '0';
+      return Math.round(value).toLocaleString('en-US');
+    };
+
+    // constants.js
+    const TEMPLATE_TYPES = {
+      SEM_SOCIAL: 'sem-social',
+      PROGRAMMATIC: 'programmatic',
+      YOUTUBE: 'youtube'
+    };
+
+    const tableStyles = {
+      th: "border border-gray-200 px-4 py-3 text-left text-sm font-medium text-gray-900",
+      td: "border border-gray-200 px-4 py-3 text-sm text-gray-900",
+      row: "hover:bg-gray-50",
+      rowChild: "bg-gray-50",
+      input: "w-full px-2 py-1 text-sm border rounded focus:ring-2 focus:ring-blue-500",
+      inputLocked: "bg-gray-100 cursor-not-allowed",
+      button: "px-2 py-1 text-xs rounded border border-gray-300 hover:bg-gray-50",
+      buttonPrimary: "bg-blue-500 text-white border-blue-500 hover:bg-blue-600",
+      buttonDanger: "bg-red-500 text-white border-red-500 hover:bg-red-600"
+    };
+
+    // calculations.js
+    const roundToCents = (value) => {
+      if (!value || isNaN(value)) return 0;
+      return Math.round(parseFloat(value) * 100) / 100;
+    };
+
+    const gracefulRound = (value) => {
+      if (!value || isNaN(value)) return 0;
+      return Math.round(value);
+    };
+
+    const calculateTotals = (flights, templateType) => {
+      const totals = {
+        budget: flights.reduce((sum, flight) => sum + (flight.budget || 0), 0)
+      };
+
+      if (templateType === TEMPLATE_TYPES.PROGRAMMATIC) {
+        totals.impressions = gracefulRound(flights.reduce((sum, flight) => sum + (flight.impressions || 0), 0));
+        totals.trafficBudget = flights.reduce((sum, flight) => sum + (flight.trafficBudget || 0), 0);
+        totals.trafficImpressions = gracefulRound(flights.reduce((sum, flight) => sum + (flight.trafficImpressions || 0), 0));
+      }
+
+      if (templateType === TEMPLATE_TYPES.YOUTUBE) {
+        totals.totalViews = gracefulRound(flights.reduce((sum, flight) => sum + (flight.totalViews || 0), 0));
+        totals.totalRetail = flights.reduce((sum, flight) => sum + (flight.totalRetail || 0), 0);
+      }
+
+      return totals;
+    };
+
+    // ============================================================================
+    // HOOKS (from src/hooks/)
+    // ============================================================================
+
+    const parseToCents = (str) => {
+      const cleaned = str.replace(/[^0-9.]/g, '');
+      const value = parseFloat(cleaned);
+      return isNaN(value) ? 0 : roundToCents(value);
+    };
+
+    const parseToInteger = (str) => {
+      const cleaned = str.replace(/[^0-9]/g, '');
+      const value = parseInt(cleaned, 10);
+      return isNaN(value) ? 0 : value;
+    };
+
+    function useEditBuffer(initialValue, onCommit, parseFn = parseFloat) {
+      const [editing, setEditing] = useState(false);
+      const [buffer, setBuffer] = useState('');
+
+      const start = (value) => {
+        setBuffer(String(value));
+        setEditing(true);
+      };
+
+      const commit = () => {
+        const parsed = parseFn(buffer);
+        if (!isNaN(parsed)) {
+          onCommit(parsed);
+        }
+        setEditing(false);
+      };
+
+      const cancel = () => {
+        setEditing(false);
+      };
+
+      const handleKeyDown = (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          commit();
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          cancel();
+        }
+      };
+
+      return { editing, buffer, setBuffer, start, commit, cancel, handleKeyDown };
+    }
+
+    // ============================================================================
+    // COMPONENTS (from src/components/)
+    // ============================================================================
+
+    // LineCell
+    function LineCell({ flight, isCollapsed, isSelected, onToggleCollapse, onToggleSelect }) {
+      const handleClick = () => {
+        if (flight.isParent) {
+          onToggleCollapse?.();
+        } else if (flight.line !== '-' && !flight.isChild) {
+          onToggleSelect?.();
+        }
+      };
+
+      const cellClasses = [
+        tableStyles.td,
+        flight.isParent ? 'cursor-pointer' : '',
+        isSelected ? 'bg-blue-50' : ''
+      ].filter(Boolean).join(' ');
+
+      return (
+        <td className={cellClasses} onClick={handleClick}>
+          <div className="flex items-center justify-center space-x-1">
+            {flight.isParent && (
+              <svg className={`w-3 h-3 transform transition-transform ${isCollapsed ? 'rotate-0' : 'rotate-90'}`} fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+              </svg>
+            )}
+            <span>{flight.line}</span>
+          </div>
+        </td>
+      );
+    }
+
+    // DateCell
+    function DateCell({ startDate, endDate }) {
+      return (
+        <>
+          <td className={tableStyles.td}>
+            {formatDate(startDate)}
+          </td>
+          <td className={tableStyles.td}>
+            {formatDate(endDate)}
+          </td>
+        </>
+      );
+    }
+
+    // BudgetCell
+    function BudgetCell({ value, onCommit, locked = false, selected = false }) {
+      const { editing, buffer, setBuffer, start, commit, cancel, handleKeyDown } = useEditBuffer(
+        value?.toFixed(2) || '0.00',
+        onCommit,
+        parseToCents
+      );
+
+      const bgClass = locked ? tableStyles.inputLocked : selected ? 'bg-blue-50' : '';
+
+      if (editing) {
+        return (
+          <input
+            type="text"
+            inputMode="decimal"
+            className={`${tableStyles.input} ${bgClass}`}
+            value={buffer}
+            autoFocus
+            onChange={(e) => setBuffer(e.target.value)}
+            onBlur={commit}
+            onKeyDown={handleKeyDown}
+            disabled={locked}
+          />
+        );
+      }
+
+      return (
+        <button
+          className={`w-full text-left px-2 py-1 rounded ${locked ? 'cursor-not-allowed' : 'hover:bg-gray-100'}`}
+          onClick={() => !locked && start(value)}
+          disabled={locked}
+        >
+          ${value?.toFixed(2) || '0.00'}
+        </button>
+      );
+    }
+
+    // NumberCell
+    function NumberCell({ value, onCommit, locked = false, selected = false, label = 'value' }) {
+      const { editing, buffer, setBuffer, start, commit, cancel, handleKeyDown } = useEditBuffer(
+        value?.toString() || '0',
+        onCommit,
+        parseToInteger
+      );
+
+      const bgClass = locked ? tableStyles.inputLocked : selected ? 'bg-blue-50' : '';
+
+      if (editing) {
+        return (
+          <input
+            type="text"
+            inputMode="numeric"
+            className={`${tableStyles.input} ${bgClass}`}
+            value={buffer}
+            autoFocus
+            onChange={(e) => setBuffer(e.target.value.replace(/[^0-9]/g, ''))}
+            onBlur={commit}
+            onKeyDown={handleKeyDown}
+            disabled={locked}
+          />
+        );
+      }
+
+      return (
+        <button
+          className={`w-full text-left px-2 py-1 rounded ${locked ? 'cursor-not-allowed' : 'hover:bg-gray-100'}`}
+          onClick={() => !locked && start(value)}
+          disabled={locked}
+        >
+          {formatNumber(value || 0)}
+        </button>
+      );
+    }
+
+    // DerivedCell
+    function DerivedCell({ value, type = 'number', locked = false, selected = false }) {
+      const formattedValue = type === 'currency' ? formatCurrency(value) :
+                            type === 'integer' ? formatNumber(value) :
+                            formatNumber(value);
+
+      const bgClass = locked ? tableStyles.inputLocked : selected ? 'bg-blue-50' : '';
+
+      return (
+        <td className={`${tableStyles.td} ${bgClass}`}>
+          <span className="px-2 py-1">{formattedValue}</span>
+        </td>
+      );
+    }
+
+    // ActionsCell
+    function ActionsCell({ flight, onSplit, onLock, onZeroOut }) {
+      const getLockIcon = () => {
+        if (flight.locked === 'all') return '🔒';
+        return '🔓';
+      };
+
+      return (
+        <td className={tableStyles.td}>
+          <div className="flex space-x-1">
+            <button onClick={onSplit} className={`${tableStyles.button} ${tableStyles.buttonPrimary}`}>
+              Split
+            </button>
+            <button onClick={onLock} className={tableStyles.button}>
+              {getLockIcon()}
+            </button>
+            <button onClick={onZeroOut} className={`${tableStyles.button} ${tableStyles.buttonDanger}`}>
+              Zero
+            </button>
+          </div>
+        </td>
+      );
+    }
+
+    // FlightTableHeader
+    function FlightTableHeader({ templateType }) {
+      const renderHeaders = () => {
+        switch (templateType) {
+          case TEMPLATE_TYPES.SEM_SOCIAL:
+            return (
+              <>
+                <th className={tableStyles.th}>Line</th>
+                <th className={tableStyles.th}>Start Date</th>
+                <th className={tableStyles.th}>End Date</th>
+                <th className={tableStyles.th}>Budget</th>
+                <th className={tableStyles.th}>Actions</th>
+              </>
+            );
+
+          case TEMPLATE_TYPES.PROGRAMMATIC:
+            return (
+              <>
+                <th className={tableStyles.th}>Line</th>
+                <th className={tableStyles.th}>Start Date</th>
+                <th className={tableStyles.th}>End Date</th>
+                <th className={tableStyles.th}>Budget</th>
+                <th className={tableStyles.th}>Impressions</th>
+                <th className={tableStyles.th}>Traffic Budget</th>
+                <th className={tableStyles.th}>Traffic Impressions</th>
+                <th className={tableStyles.th}>Actions</th>
+              </>
+            );
+
+          case TEMPLATE_TYPES.YOUTUBE:
+            return (
+              <>
+                <th className={tableStyles.th}>Line</th>
+                <th className={tableStyles.th}>Flight Start</th>
+                <th className={tableStyles.th}>Flight End</th>
+                <th className={tableStyles.th}>Total Views</th>
+                <th className={tableStyles.th}>Days in Flight</th>
+                <th className={tableStyles.th}>Daily Views</th>
+                <th className={tableStyles.th}>Daily Platform Budget</th>
+                <th className={tableStyles.th}>Total Retail</th>
+                <th className={tableStyles.th}>Actions</th>
+              </>
+            );
+
+          default:
+            return null;
+        }
+      };
+
+      return (
+        <thead>
+          <tr className="bg-gray-50">
+            {renderHeaders()}
+          </tr>
+        </thead>
+      );
+    }
+
+    // FlightTableFooter
+    function FlightTableFooter({ totals, templateType }) {
+      const renderTotals = () => {
+        switch (templateType) {
+          case TEMPLATE_TYPES.SEM_SOCIAL:
+            return (
+              <>
+                <td className="border border-gray-200 px-4 py-3 text-sm text-gray-900">Total</td>
+                <td className="border border-gray-200 px-4 py-3" />
+                <td className="border border-gray-200 px-4 py-3" />
+                <td className="border border-gray-200 px-4 py-3 text-sm text-gray-900">
+                  {formatCurrency(totals.budget)}
+                </td>
+                <td className="border border-gray-200 px-4 py-3" />
+              </>
+            );
+
+          case TEMPLATE_TYPES.PROGRAMMATIC:
+            return (
+              <>
+                <td className="border border-gray-200 px-4 py-3 text-sm text-gray-900">Total</td>
+                <td className="border border-gray-200 px-4 py-3" />
+                <td className="border border-gray-200 px-4 py-3" />
+                <td className="border border-gray-200 px-4 py-3 text-sm text-gray-900">
+                  {formatCurrency(totals.budget)}
+                </td>
+                <td className="border border-gray-200 px-4 py-3 text-sm text-gray-900">
+                  {formatNumber(totals.impressions || 0)}
+                </td>
+                <td className="border border-gray-200 px-4 py-3 text-sm text-gray-900">
+                  {formatCurrency(totals.trafficBudget || 0)}
+                </td>
+                <td className="border border-gray-200 px-4 py-3 text-sm text-gray-900">
+                  {formatNumber(totals.trafficImpressions || 0)}
+                </td>
+                <td className="border border-gray-200 px-4 py-3" />
+              </>
+            );
+
+          case TEMPLATE_TYPES.YOUTUBE:
+            return (
+              <>
+                <td className="border border-gray-200 px-4 py-3 text-sm text-gray-900">Total</td>
+                <td className="border border-gray-200 px-4 py-3" />
+                <td className="border border-gray-200 px-4 py-3" />
+                <td className="border border-gray-200 px-4 py-3 text-sm text-gray-900">
+                  {formatNumber(totals.totalViews || 0)}
+                </td>
+                <td className="border border-gray-200 px-4 py-3" />
+                <td className="border border-gray-200 px-4 py-3" />
+                <td className="border border-gray-200 px-4 py-3" />
+                <td className="border border-gray-200 px-4 py-3 text-sm text-gray-900">
+                  {formatCurrency(totals.totalRetail || 0)}
+                </td>
+                <td className="border border-gray-200 px-4 py-3" />
+              </>
+            );
+
+          default:
+            return null;
+        }
+      };
+
+      return (
+        <tfoot>
+          <tr className="bg-blue-50 font-semibold">
+            {renderTotals()}
+          </tr>
+        </tfoot>
+      );
+    }
+
+    // FlightRow
+    function FlightRow({
+      flight,
+      templateType,
+      campaignIndex,
+      isCollapsed,
+      isSelected,
+      onUpdateFlight,
+      onSplitFlight,
+      onLockFlight,
+      onZeroOutFlight,
+      onToggleCollapse,
+      onToggleSelect
+    }) {
+      const rowClasses = [
+        tableStyles.row,
+        flight.isChild ? tableStyles.rowChild : ''
+      ].filter(Boolean).join(' ');
+
+      const handleBudgetCommit = (newValue) => {
+        onUpdateFlight(campaignIndex, flight.id, 'budget', newValue);
+      };
+
+      const handleNumberCommit = (field) => (newValue) => {
+        onUpdateFlight(campaignIndex, flight.id, field, newValue);
+      };
+
+      const renderCells = () => {
+        switch (templateType) {
+          case TEMPLATE_TYPES.SEM_SOCIAL:
+            return (
+              <>
+                <LineCell
+                  flight={flight}
+                  isCollapsed={isCollapsed}
+                  isSelected={isSelected}
+                  onToggleCollapse={onToggleCollapse}
+                  onToggleSelect={onToggleSelect}
+                />
+                <DateCell
+                  startDate={flight.startDate}
+                  endDate={flight.endDate}
+                />
+                <td className={tableStyles.td}>
+                  <BudgetCell
+                    value={flight.budget}
+                    onCommit={handleBudgetCommit}
+                    locked={flight.locked === 'all' || flight.locked === 'budget'}
+                    selected={isSelected}
+                  />
+                </td>
+                <ActionsCell
+                  flight={flight}
+                  onSplit={() => onSplitFlight(campaignIndex, flight.id)}
+                  onLock={() => onLockFlight(campaignIndex, flight.id)}
+                  onZeroOut={() => onZeroOutFlight(campaignIndex, flight.id)}
+                />
+              </>
+            );
+
+          case TEMPLATE_TYPES.PROGRAMMATIC:
+            return (
+              <>
+                <LineCell
+                  flight={flight}
+                  isCollapsed={isCollapsed}
+                  isSelected={isSelected}
+                  onToggleCollapse={onToggleCollapse}
+                  onToggleSelect={onToggleSelect}
+                />
+                <DateCell
+                  startDate={flight.startDate}
+                  endDate={flight.endDate}
+                />
+                <td className={tableStyles.td}>
+                  <BudgetCell
+                    value={flight.budget}
+                    onCommit={handleBudgetCommit}
+                    locked={flight.locked === 'all' || flight.locked === 'budget'}
+                    selected={isSelected}
+                  />
+                </td>
+                <td className={tableStyles.td}>
+                  <NumberCell
+                    value={flight.impressions}
+                    onCommit={handleNumberCommit('impressions')}
+                    locked={flight.locked === 'all' || flight.locked === 'impressions'}
+                    selected={isSelected}
+                    label="impressions"
+                  />
+                </td>
+                <DerivedCell
+                  value={flight.trafficBudget}
+                  type="currency"
+                  locked={flight.locked === 'all'}
+                  selected={isSelected}
+                />
+                <DerivedCell
+                  value={flight.trafficImpressions}
+                  type="number"
+                  locked={flight.locked === 'all'}
+                  selected={isSelected}
+                />
+                <ActionsCell
+                  flight={flight}
+                  onSplit={() => onSplitFlight(campaignIndex, flight.id)}
+                  onLock={() => onLockFlight(campaignIndex, flight.id)}
+                  onZeroOut={() => onZeroOutFlight(campaignIndex, flight.id)}
+                />
+              </>
+            );
+
+          case TEMPLATE_TYPES.YOUTUBE:
+            return (
+              <>
+                <LineCell
+                  flight={flight}
+                  isCollapsed={isCollapsed}
+                  isSelected={isSelected}
+                  onToggleCollapse={onToggleCollapse}
+                  onToggleSelect={onToggleSelect}
+                />
+                <DateCell
+                  startDate={flight.startDate}
+                  endDate={flight.endDate}
+                />
+                <td className={tableStyles.td}>
+                  <NumberCell
+                    value={flight.totalViews || flight.views}
+                    onCommit={handleNumberCommit('totalViews')}
+                    locked={flight.locked === 'all'}
+                    selected={isSelected}
+                    label="total views"
+                  />
+                </td>
+                <DerivedCell
+                  value={flight.daysInFlight}
+                  type="integer"
+                  locked={flight.locked === 'all'}
+                  selected={isSelected}
+                />
+                <DerivedCell
+                  value={flight.dailyViews}
+                  type="integer"
+                  locked={flight.locked === 'all'}
+                  selected={isSelected}
+                />
+                <DerivedCell
+                  value={flight.dailyPlatformBudget}
+                  type="currency"
+                  locked={flight.locked === 'all'}
+                  selected={isSelected}
+                />
+                <DerivedCell
+                  value={flight.totalRetail}
+                  type="currency"
+                  locked={flight.locked === 'all'}
+                  selected={isSelected}
+                />
+                <ActionsCell
+                  flight={flight}
+                  onSplit={() => onSplitFlight(campaignIndex, flight.id)}
+                  onLock={() => onLockFlight(campaignIndex, flight.id)}
+                  onZeroOut={() => onZeroOutFlight(campaignIndex, flight.id)}
+                />
+              </>
+            );
+
+          default:
+            return null;
+        }
+      };
+
+      return (
+        <tr className={rowClasses}>
+          {renderCells()}
+        </tr>
+      );
+    }
+
+    // FlightTableBody
+    function FlightTableBody({
+      flights,
+      templateType,
+      campaignIndex,
+      collapsedFlights = new Set(),
+      selectedFlights = new Set(),
+      onUpdateFlight,
+      onSplitFlight,
+      onLockFlight,
+      onZeroOutFlight,
+      onToggleCollapse,
+      onToggleSelect
+    }) {
+      const visibleFlights = flights.filter(flight => {
+        if (!flight.isChild) return true;
+        return !collapsedFlights.has(flight.parentId);
+      });
+
+      return (
+        <tbody>
+          {visibleFlights.map((flight) => (
+            <FlightRow
+              key={flight.id}
+              flight={flight}
+              templateType={templateType}
+              campaignIndex={campaignIndex}
+              isCollapsed={flight.isParent && collapsedFlights.has(flight.id)}
+              isSelected={selectedFlights.has(flight.id)}
+              onUpdateFlight={onUpdateFlight}
+              onSplitFlight={onSplitFlight}
+              onLockFlight={onLockFlight}
+              onZeroOutFlight={onZeroOutFlight}
+              onToggleCollapse={() => onToggleCollapse(flight.id)}
+              onToggleSelect={() => onToggleSelect(flight.id)}
+            />
+          ))}
+        </tbody>
+      );
+    }
+
+    // FlightTable
+    function FlightTable({
+      campaign,
+      campaignIndex,
+      templateType,
+      totals,
+      collapsedFlights = new Set(),
+      selectedFlights = new Set(),
+      onUpdateFlight,
+      onSplitFlight,
+      onLockFlight,
+      onZeroOutFlight,
+      onToggleCollapse,
+      onToggleSelect
+    }) {
+      return (
+        <div className="overflow-x-auto">
+          <table className="min-w-full bg-white border border-gray-200">
+            <FlightTableHeader templateType={templateType} />
+            <FlightTableBody
+              flights={campaign.flights}
+              templateType={templateType}
+              campaignIndex={campaignIndex}
+              collapsedFlights={collapsedFlights}
+              selectedFlights={selectedFlights}
+              onUpdateFlight={onUpdateFlight}
+              onSplitFlight={onSplitFlight}
+              onLockFlight={onLockFlight}
+              onZeroOutFlight={onZeroOutFlight}
+              onToggleCollapse={onToggleCollapse}
+              onToggleSelect={onToggleSelect}
+            />
+            <FlightTableFooter totals={totals} templateType={templateType} />
+          </table>
+        </div>
+      );
+    }
+
+    // ============================================================================
+    // TEST APP
+    // ============================================================================
+
+    const sampleCampaigns = [
+      {
+        id: 1,
+        name: 'SEM Test Campaign',
+        templateType: TEMPLATE_TYPES.SEM_SOCIAL,
+        flights: [
+          {
+            id: 'f1',
+            line: 1,
+            startDate: '2025-01-01',
+            endDate: '2025-01-31',
+            budget: 5000.00,
+            isParent: false,
+            isChild: false,
+            locked: null
+          },
+          {
+            id: 'f2',
+            line: 2,
+            startDate: '2025-02-01',
+            endDate: '2025-02-28',
+            budget: 3500.50,
+            isParent: false,
+            isChild: false,
+            locked: null
+          }
+        ]
+      },
+      {
+        id: 2,
+        name: 'Programmatic Test Campaign',
+        templateType: TEMPLATE_TYPES.PROGRAMMATIC,
+        flights: [
+          {
+            id: 'f3',
+            line: 1,
+            startDate: '2025-01-01',
+            endDate: '2025-01-31',
+            budget: 10000.00,
+            impressions: 500000,
+            trafficBudget: 10100.00,
+            trafficImpressions: 505000,
+            isParent: false,
+            isChild: false,
+            locked: null
+          },
+          {
+            id: 'f4',
+            line: 2,
+            startDate: '2025-02-01',
+            endDate: '2025-02-28',
+            budget: 8000.00,
+            impressions: 400000,
+            trafficBudget: 8080.00,
+            trafficImpressions: 404000,
+            isParent: false,
+            isChild: false,
+            locked: null
+          }
+        ]
+      },
+      {
+        id: 3,
+        name: 'YouTube Test Campaign',
+        templateType: TEMPLATE_TYPES.YOUTUBE,
+        flights: [
+          {
+            id: 'f5',
+            line: 1,
+            startDate: '2025-01-01',
+            endDate: '2025-01-31',
+            totalViews: 1000000,
+            daysInFlight: 31,
+            dailyViews: 32258,
+            dailyPlatformBudget: 322.58,
+            totalRetail: 12000.00,
+            isParent: false,
+            isChild: false,
+            locked: null
+          },
+          {
+            id: 'f6',
+            line: 2,
+            startDate: '2025-02-01',
+            endDate: '2025-02-28',
+            totalViews: 800000,
+            daysInFlight: 28,
+            dailyViews: 28571,
+            dailyPlatformBudget: 285.71,
+            totalRetail: 9600.00,
+            isParent: false,
+            isChild: false,
+            locked: null
+          }
+        ]
+      }
+    ];
+
+    function App() {
+      const [campaigns] = useState(sampleCampaigns);
+      const [activeTab, setActiveTab] = useState(0);
+      const [collapsedFlights, setCollapsedFlights] = useState(new Set());
+      const [selectedFlights, setSelectedFlights] = useState(new Set());
+
+      const activeCampaign = campaigns[activeTab];
+
+      const handleUpdateFlight = (campaignIndex, flightId, field, value) => {
+        console.log(`Update flight ${flightId} field ${field} to ${value}`);
+      };
+
+      const handleSplitFlight = (campaignIndex, flightId) => {
+        console.log(`Split flight ${flightId}`);
+      };
+
+      const handleLockFlight = (campaignIndex, flightId) => {
+        console.log(`Lock flight ${flightId}`);
+      };
+
+      const handleZeroOutFlight = (campaignIndex, flightId) => {
+        console.log(`Zero out flight ${flightId}`);
+      };
+
+      const handleToggleCollapse = (flightId) => {
+        setCollapsedFlights(prev => {
+          const next = new Set(prev);
+          if (next.has(flightId)) {
+            next.delete(flightId);
+          } else {
+            next.add(flightId);
+          }
+          return next;
+        });
+      };
+
+      const handleToggleSelect = (flightId) => {
+        setSelectedFlights(prev => {
+          const next = new Set(prev);
+          if (next.has(flightId)) {
+            next.delete(flightId);
+          } else {
+            next.add(flightId);
+          }
+          return next;
+        });
+      };
+
+      const totals = useMemo(() =>
+        calculateTotals(activeCampaign.flights, activeCampaign.templateType),
+        [activeCampaign.flights, activeCampaign.templateType]
+      );
+
+      return (
+        <div className="min-h-screen bg-gray-100 p-8">
+          <div className="max-w-7xl mx-auto">
+            <h1 className="text-3xl font-bold text-gray-900 mb-8">
+              Flight Table Component Test
+            </h1>
+
+            <div className="mb-6 border-b border-gray-200">
+              <div className="flex space-x-4">
+                {campaigns.map((campaign, index) => (
+                  <button
+                    key={campaign.id}
+                    onClick={() => setActiveTab(index)}
+                    className={`px-4 py-2 font-medium border-b-2 transition-colors ${
+                      activeTab === index
+                        ? 'border-blue-500 text-blue-600'
+                        : 'border-transparent text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    {campaign.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="bg-white p-4 rounded-lg shadow mb-6">
+              <h2 className="text-xl font-semibold text-gray-900">
+                {activeCampaign.name}
+              </h2>
+              <p className="text-sm text-gray-600 mt-1">
+                Template Type: <span className="font-medium">{activeCampaign.templateType}</span>
+              </p>
+            </div>
+
+            <div className="bg-white rounded-lg shadow">
+              <FlightTable
+                campaign={activeCampaign}
+                campaignIndex={activeTab}
+                templateType={activeCampaign.templateType}
+                totals={totals}
+                collapsedFlights={collapsedFlights}
+                selectedFlights={selectedFlights}
+                onUpdateFlight={handleUpdateFlight}
+                onSplitFlight={handleSplitFlight}
+                onLockFlight={handleLockFlight}
+                onZeroOutFlight={handleZeroOutFlight}
+                onToggleCollapse={handleToggleCollapse}
+                onToggleSelect={handleToggleSelect}
+              />
+            </div>
+
+            <div className="mt-6 bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm">
+              <p className="font-semibold mb-2">Debug Info:</p>
+              <p>Active Tab: {activeTab}</p>
+              <p>Template: {activeCampaign.templateType}</p>
+              <p>Flights: {activeCampaign.flights.length}</p>
+              <p>Selected: {selectedFlights.size}</p>
+              <p>Collapsed: {collapsedFlights.size}</p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>

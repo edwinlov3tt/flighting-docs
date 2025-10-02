@@ -37,3 +37,11 @@ Thumbs.db
 # Excel temporary files
 ~$*.xlsx
 ~$*.xls
+
+# Vite build output
+dist/
+dist-ssr/
+*.local
+
+# Vercel
+.vercel

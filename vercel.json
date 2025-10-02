@@ -1,0 +1,17 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "framework": "vite",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ],
+  "functions": {
+    "api/excel-export.js": {
+      "maxDuration": 30,
+      "memory": 1024
+    }
+  },
+  "includeFiles": [
+    "templates/**"
+  ]
+}

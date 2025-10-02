@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flight Table Component Test</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- React 18 Production -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+
+  <!-- Babel Standalone -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- Utils -->
+  <script type="text/babel" data-type="module">
+    const { useState, useMemo } = React;
+
+    // Import all utilities inline for testing
+    ${(() => {
+      const fs = require('fs');
+      const formattersPath = '/Users/edwinlovettiii/Desktop/flighting-docs/src/utils/formatters.js';
+      const calculationsPath = '/Users/edwinlovettiii/Desktop/flighting-docs/src/utils/calculations.js';
+      const dateHelpersPath = '/Users/edwinlovettiii/Desktop/flighting-docs/src/utils/dateHelpers.js';
+      const constantsPath = '/Users/edwinlovettiii/Desktop/flighting-docs/src/utils/constants.js';
+
+      return `
+        // formatters.js
+        ${fs.readFileSync(formattersPath, 'utf8').replace(/export /g, 'window.')}
+
+        // calculations.js
+        ${fs.readFileSync(calculationsPath, 'utf8').replace(/export /g, 'window.')}
+
+        // dateHelpers.js
+        ${fs.readFileSync(dateHelpersPath, 'utf8').replace(/export /g, 'window.')}
+
+        // constants.js
+        ${fs.readFileSync(constantsPath, 'utf8').replace(/export /g, 'window.')}
+      `;
+    })()}
+  </script>
+
+  <!-- Components -->
+  <script type="text/babel" data-type="module">
+    // This will be populated with component code
+    // For now, we'll use a simple test message
+
+    function App() {
+      return (
+        <div className="min-h-screen bg-gray-100 p-8">
+          <div className="max-w-7xl mx-auto">
+            <h1 className="text-3xl font-bold text-gray-900 mb-8">
+              Flight Table Component Test
+            </h1>
+            <div className="bg-white p-6 rounded-lg shadow">
+              <p className="text-gray-700">
+                Component test harness loading...
+              </p>
+              <p className="text-sm text-gray-500 mt-2">
+                React: {React.version}
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
