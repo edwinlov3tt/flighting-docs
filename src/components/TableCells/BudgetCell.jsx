@@ -48,7 +48,7 @@ export function BudgetCell({ value, onCommit, locked = false, selected = false }
   return (
     <button
       className={`w-full text-left px-2 py-1 rounded ${locked ? 'cursor-not-allowed' : 'hover:bg-gray-100'} ${bgClass}`}
-      onClick={() => !locked && start(value)}
+      onClick={() => !locked && start(parseToCents(value))}
       disabled={locked}
       title={locked ? 'Locked' : 'Click to edit'}
     >

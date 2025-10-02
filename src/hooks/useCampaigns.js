@@ -121,6 +121,10 @@ export function useCampaigns() {
 
       if (field === 'budget' && flight.locked !== 'budget') {
         const budget = roundToCents(parseFloat(value) || 0);
+
+        // Only update if value actually changed
+        if (budget === flight.budget) return updated;
+
         flight.budget = budget;
 
         if (rate > 0) {
@@ -132,6 +136,10 @@ export function useCampaigns() {
         }
       } else if (field === 'impressions' && flight.locked !== 'impressions') {
         const impressions = gracefulRound(parseFloat(value) || 0);
+
+        // Only update if value actually changed
+        if (impressions === flight.impressions) return updated;
+
         flight.impressions = impressions;
 
         if (rate > 0) {
@@ -143,16 +151,20 @@ export function useCampaigns() {
         }
       } else if (field === 'totalViews') {
         const totalViews = gracefulRound(parseFloat(value) || 0);
+
+        // Only update if value actually changed
+        if (totalViews === flight.totalViews) return updated;
+
         flight.totalViews = totalViews;
 
         if (campaign.templateType === 'youtube' && flight.daysInFlight) {
-          flight.dailyViews = Math.round((totalViews / flight.daysInFlight) * 100) / 100;
+          flight.dailyViews = roundToCents((totalViews / flight.daysInFlight));
           if (campaign.formData.metricType === 'CPV' && rate > 0) {
-            flight.dailyPlatformBudget = flight.dailyViews * rate;
-            flight.totalRetail = totalViews * rate;
+            flight.dailyPlatformBudget = roundToCents(flight.dailyViews * rate);
+            flight.totalRetail = roundToCents(totalViews * rate);
           } else if (rate > 0) {
-            flight.dailyPlatformBudget = flight.dailyViews * (rate / 1000);
-            flight.totalRetail = totalViews * (rate / 1000);
+            flight.dailyPlatformBudget = roundToCents(flight.dailyViews * (rate / 1000));
+            flight.totalRetail = roundToCents(totalViews * (rate / 1000));
           }
         }
       }

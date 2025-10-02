@@ -18,28 +18,31 @@
  * );
  */
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 
 export function useEditBuffer(initialValue, onCommit, parseFn = parseFloat) {
   const [editing, setEditing] = useState(false);
   const [buffer, setBuffer] = useState('');
+  const originalValueRef = useRef(null);
 
   /**
    * Start editing mode
    * @param {string|number} value - The current value to edit
    */
   const start = (value) => {
+    originalValueRef.current = value;
     setBuffer(String(value));
     setEditing(true);
   };
 
   /**
    * Commit the edited value
-   * Parses the buffer and calls onCommit if valid
+   * Parses the buffer and calls onCommit if valid AND changed
    */
   const commit = () => {
     const parsed = parseFn(buffer);
-    if (!isNaN(parsed)) {
+    // Only commit if value is valid AND has actually changed
+    if (!isNaN(parsed) && parsed !== originalValueRef.current) {
       onCommit(parsed);
     }
     setEditing(false);

@@ -36,16 +36,16 @@ export const getActiveDays = (startDate, endDate) => {
 // Calculate totals for table footer
 export const calculateTotals = (flights, templateType) => {
     const totals = {
-        budget: flights.reduce((sum, flight) => sum + flight.budget, 0)
+        budget: roundToCents(flights.reduce((sum, flight) => sum + flight.budget, 0))
     };
 
     if (templateType === 'programmatic') {
         totals.impressions = gracefulRound(flights.reduce((sum, flight) => sum + (flight.impressions || 0), 0));
-        totals.trafficBudget = flights.reduce((sum, flight) => sum + (flight.trafficBudget || 0), 0);
+        totals.trafficBudget = roundToCents(flights.reduce((sum, flight) => sum + (flight.trafficBudget || 0), 0));
         totals.trafficImpressions = gracefulRound(flights.reduce((sum, flight) => sum + (flight.trafficImpressions || 0), 0));
     } else if (templateType === 'youtube') {
         totals.totalViews = gracefulRound(flights.reduce((sum, flight) => sum + (flight.totalViews || 0), 0));
-        totals.totalRetail = flights.reduce((sum, flight) => sum + (flight.totalRetail || 0), 0);
+        totals.totalRetail = roundToCents(flights.reduce((sum, flight) => sum + (flight.totalRetail || 0), 0));
     }
 
     return totals;
