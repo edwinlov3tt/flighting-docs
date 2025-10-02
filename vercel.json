@@ -8,7 +8,8 @@
   "functions": {
     "api/excel-export.js": {
       "maxDuration": 30,
-      "memory": 1024
+      "memory": 1024,
+      "includeFiles": "templates/**"
     }
   }
 }

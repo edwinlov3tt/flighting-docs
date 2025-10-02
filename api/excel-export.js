@@ -208,36 +208,51 @@ export default async function handler(req, res) {
         return;
     }
 
-    if (req.method !== 'POST' && req.method !== 'GET') {
+    if (req.method === 'GET') {
+        return res.json({ status: 'OK', message: 'Excel export serverless function is running' });
+    }
+
+    if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method not allowed' });
     }
 
-    const { url, query } = req;
-
     try {
-        if (url.includes('/api/excel-export') && (query.endpoint === 'single' || url.includes('single'))) {
-            const { campaign } = req.body;
+        const { campaign, campaigns } = req.body;
 
-            if (!campaign) {
-                return res.status(400).json({ error: 'Campaign data required' });
-            }
-
+        // Single campaign export
+        if (campaign) {
+            console.log('Exporting single campaign:', campaign.name);
             const buffer = await exporter.exportSingleCampaignEnhanced(campaign);
             const sanitizedCampaignName = campaign.name.replace(/[^\w\s-]/g, '').trim();
             const fileName = `${sanitizedCampaignName}.xlsx`;
 
             res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
             res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
-            res.send(buffer);
-
-        } else if (query.endpoint === 'health' || url.includes('/health')) {
-            res.json({ status: 'OK', message: 'Excel export server is running' });
-        } else {
-            res.status(404).json({ error: 'Endpoint not found' });
+            return res.send(buffer);
         }
+
+        // Multiple campaigns export - export each separately for now
+        if (campaigns && campaigns.length > 0) {
+            console.log('Exporting first campaign from multiple:', campaigns[0].name);
+            // For now, just export the first campaign
+            // TODO: Implement multi-sheet export
+            const buffer = await exporter.exportSingleCampaignEnhanced(campaigns[0]);
+            const fileName = 'Media_Flight_Plans.xlsx';
+
+            res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+            return res.send(buffer);
+        }
+
+        return res.status(400).json({ error: 'Campaign or campaigns data required' });
 
     } catch (error) {
         console.error('Export error:', error);
-        res.status(500).json({ error: 'Export failed', message: error.message });
+        console.error('Error stack:', error.stack);
+        return res.status(500).json({
+            error: 'Export failed',
+            message: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
     }
 }
