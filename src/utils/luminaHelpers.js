@@ -30,21 +30,9 @@ export const extractLuminaInfo = (link) => {
 
 // Fetch order/lineitem data from API
 export const fetchLuminaData = async (id, type) => {
-  try {
-    const url = type === 'lineitem'
-      ? `${window.APP_CONFIG.ORDER_API}?query=${id}&type=lineitem`
-      : `${window.APP_CONFIG.ORDER_API}?query=${id}`;
-
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`API request failed: ${response.status}`);
-    }
-
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    throw new Error(error.message || 'Failed to fetch Lumina data');
-  }
+  // Lumina API integration is not available in this deployment
+  // To enable Lumina import, configure the ORDER_API endpoint
+  throw new Error('Lumina import is not configured. Please use manual campaign creation or contact your administrator to enable Lumina integration.');
 };
 
 // Process lumina data and extract tactics
