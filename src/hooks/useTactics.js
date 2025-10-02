@@ -196,11 +196,39 @@ const mapTactic = (tactic) => {
 
 export function useTactics() {
   const [tactics, setTactics] = useState(defaultTacticData);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Just use default tactics - no need to fetch from API
-  // If API integration is needed in the future, add it here
+  useEffect(() => {
+    const fetchTactics = async () => {
+      setLoading(true);
+      setError('');
+
+      try {
+        const response = await fetch('/api/tactics');
+        if (!response.ok) {
+          throw new Error(`Failed to fetch tactics: ${response.status}`);
+        }
+
+        const apiTactics = await response.json();
+        const mappedTactics = apiTactics.map(mapTactic);
+
+        if (mappedTactics.length > 0) {
+          setTactics(mappedTactics);
+          console.log('✅ Loaded tactics from API');
+        } else {
+          console.warn('API returned no tactics, using defaults');
+        }
+      } catch (err) {
+        console.warn('Failed to load tactics from API, using defaults:', err.message);
+        // Keep using default tactics on error - no need to show error to user
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTactics();
+  }, []);
 
   return { tactics, loading, error };
 }
