@@ -16,7 +16,9 @@ export function EditCampaignModal({
   isOpen,
   campaign,
   onClose,
-  onSave
+  onSave,
+  onUpdateCampaign,
+  onUpdateCampaignName
 }) {
   const [totalBudget, setTotalBudget] = useState('');
   const [cpm, setCpm] = useState('');
@@ -157,6 +159,40 @@ export function EditCampaignModal({
             <option value="sem-social">SEM / Social</option>
           </select>
         </div>
+
+        {/* Name Type Selector - Only for Lumina campaigns */}
+        {campaign.luminaTactic && (
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Campaign Name Type
+            </label>
+            <select
+              value={campaign.luminaTactic.nameType || 'displayName'}
+              onChange={(e) => {
+                const newNameType = e.target.value;
+                const newName = newNameType === 'campaignInitiative'
+                  ? campaign.luminaTactic.campaignInitiative
+                  : campaign.luminaTactic.displayName;
+
+                if (onUpdateCampaignName) {
+                  onUpdateCampaignName(newName);
+                }
+                if (onUpdateCampaign) {
+                  onUpdateCampaign({
+                    luminaTactic: {
+                      ...campaign.luminaTactic,
+                      nameType: newNameType
+                    }
+                  });
+                }
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="displayName">Display Name</option>
+              <option value="campaignInitiative">Campaign Initiative</option>
+            </select>
+          </div>
+        )}
 
         {/* Warning Message */}
         {editingEnabled && (

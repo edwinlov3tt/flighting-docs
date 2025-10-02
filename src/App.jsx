@@ -1,7 +1,7 @@
 /**
  * App Component (Main Application)
  *
- * Root component for Media Flight Planner
+ * Root component for Budget Flighting Doc Planner
  * Integrates all sub-components and manages application-level state
  */
 
@@ -433,8 +433,8 @@ export default function App() {
       <div className="max-w-7xl mx-auto p-6">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Media Flight Planner</h1>
-          <p className="text-gray-600 mt-2">Plan and manage your media flight campaigns</p>
+          <h1 className="text-3xl font-bold text-gray-900">Budget Flighting Doc Planner</h1>
+          <p className="text-gray-600 mt-2">Plan and manage budget flighting for your campaigns</p>
         </div>
 
         {/* Campaign Form */}
@@ -547,7 +547,7 @@ export default function App() {
                 ) : (
                   <>
                     <h3 className="text-lg font-semibold text-gray-900">
-                      {activeCampaign.name} Flight Plan
+                      {activeCampaign.name}
                     </h3>
                     <svg
                       onClick={handleStartRenameCampaign}
@@ -558,40 +558,21 @@ export default function App() {
                     >
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                     </svg>
-
-                    {/* Name Type Selector for Lumina Campaigns */}
-                    {activeCampaign.luminaTactic && (
-                      <select
-                        value={activeCampaign.luminaTactic.nameType || 'displayName'}
-                        onChange={(e) => {
-                          const newNameType = e.target.value;
-                          const newName = newNameType === 'campaignInitiative'
-                            ? activeCampaign.luminaTactic.campaignInitiative
-                            : activeCampaign.luminaTactic.displayName;
-                          updateCampaignName(activeTab, newName);
-                          // Update the nameType in luminaTactic
-                          updateCampaign(activeTab, {
-                            ...activeCampaign,
-                            luminaTactic: {
-                              ...activeCampaign.luminaTactic,
-                              nameType: newNameType
-                            }
-                          });
-                        }}
-                        className="ml-3 px-2 py-1 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      >
-                        <option value="displayName">Display Name</option>
-                        <option value="campaignInitiative">Campaign Initiative</option>
-                      </select>
-                    )}
                   </>
                 )}
               </div>
 
-              <div className="flex space-x-2">
-                {/* Undo/Redo Buttons - Only show after first edit */}
+              <div className="flex space-x-3">
+                {/* History Controls - Only show after first edit */}
                 {hasHistory && (
-                  <>
+                  <div className="flex space-x-2 border-r border-gray-300 pr-3">
+                    <button
+                      onClick={handleResetCampaign}
+                      className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                      title="Reset to original state"
+                    >
+                      Reset
+                    </button>
                     <button
                       onClick={undo}
                       disabled={!canUndo}
@@ -616,7 +597,7 @@ export default function App() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 10h-10a8 8 0 00-8 8v2M21 10l-6 6m6-6l-6-6" />
                       </svg>
                     </button>
-                  </>
+                  </div>
                 )}
 
                 <button
@@ -632,13 +613,6 @@ export default function App() {
                   Edit Plan
                 </button>
                 <button
-                  onClick={handleResetCampaign}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
-                  title="Reset to original state"
-                >
-                  Reset
-                </button>
-                <button
                   onClick={handleExportCampaign}
                   disabled={exportLoading}
                   className={`px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 ${exportLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
@@ -646,19 +620,19 @@ export default function App() {
                   {exportLoading ? 'Exporting...' : 'Export'}
                 </button>
 
-                {/* Open in Lumina button - only show for Lumina imports */}
+                {/* Lumina button - only show for Lumina imports */}
                 {activeCampaign.luminaTactic?.luminaUrl && (
                   <a
                     href={activeCampaign.luminaTactic.luminaUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center space-x-2"
+                    className="px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center space-x-2"
                     title="Open in Lumina"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                     </svg>
-                    <span>Open in Lumina</span>
+                    <span>Lumina</span>
                   </a>
                 )}
               </div>
@@ -816,6 +790,8 @@ export default function App() {
           campaign={activeCampaign}
           onClose={() => setShowEditModal(false)}
           onSave={handleEditCampaign}
+          onUpdateCampaign={(updates) => updateCampaign(activeTab, updates)}
+          onUpdateCampaignName={(newName) => updateCampaignName(activeTab, newName)}
         />
       </div>
 
