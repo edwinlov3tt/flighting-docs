@@ -211,21 +211,30 @@ class ExcelExporter {
             // Export this campaign with its proper template and formatting
             const buffer = await this.exportSingleCampaignEnhanced(campaign);
 
+            // Ensure buffer is a proper Buffer
+            const properBuffer = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
+
             // Sanitize filename for the zip
             const sanitizedName = campaign.name.replace(/[^a-zA-Z0-9-_ ]/g, '').trim();
             const fileName = `${sanitizedName}.xlsx`;
 
-            // Add to zip - specify binary option to prevent corruption
-            zip.file(fileName, buffer, { binary: true });
+            console.log(`Adding ${fileName} to ZIP (${properBuffer.length} bytes)`);
+
+            // Add to zip as arraybuffer (more reliable for binary data)
+            zip.file(fileName, properBuffer, {
+                binary: true,
+                compression: 'STORE'
+            });
         }
 
         // Generate the zip file as a buffer
         const zipBuffer = await zip.generateAsync({
             type: 'nodebuffer',
-            compression: 'DEFLATE',
-            compressionOptions: { level: 6 }
+            compression: 'STORE',
+            streamFiles: false
         });
 
+        console.log(`Generated ZIP file (${zipBuffer.length} bytes)`);
         return zipBuffer;
     }
 }
