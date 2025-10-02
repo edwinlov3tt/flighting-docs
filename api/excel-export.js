@@ -198,6 +198,34 @@ class ExcelExporter {
         return await workbook.outputAsync();
     }
 
+    async copySheetContents(sourceSheet, targetSheet) {
+        // Copy all cell values and styles from source to target
+        const usedRange = sourceSheet.usedRange();
+        if (usedRange) {
+            const values = usedRange.value();
+            targetSheet.range(usedRange.address()).value(values);
+
+            // Copy styles cell by cell
+            const startRow = usedRange.startCell().rowNumber();
+            const endRow = usedRange.endCell().rowNumber();
+            const startCol = usedRange.startCell().columnNumber();
+            const endCol = usedRange.endCell().columnNumber();
+
+            for (let row = startRow; row <= endRow; row++) {
+                for (let col = startCol; col <= endCol; col++) {
+                    const sourceCell = sourceSheet.row(row).cell(col);
+                    const targetCell = targetSheet.row(row).cell(col);
+
+                    // Copy style if it exists
+                    const style = sourceCell.style();
+                    if (style && Object.keys(style).length > 0) {
+                        targetCell.style(style);
+                    }
+                }
+            }
+        }
+    }
+
     async exportMultipleCampaigns(campaigns) {
         // Start with a fresh template for the first campaign
         let workbook = await this.loadTemplateWithPopulate(campaigns[0].templateType || 'default');
@@ -210,24 +238,26 @@ class ExcelExporter {
         // Apply first campaign data
         await this.applyEnhancedMapping(firstSheet, campaigns[0], campaigns[0].templateType || 'programmatic');
 
-        // Process remaining campaigns by loading fresh templates and copying sheets
+        // Process remaining campaigns by loading fresh templates and copying content
         for (let i = 1; i < campaigns.length; i++) {
             const campaign = campaigns[i];
             const templateType = campaign.templateType || 'programmatic';
 
-            // Load a fresh template
+            // Load a fresh template to get the template structure
             const tempWorkbook = await this.loadTemplateWithPopulate(templateType);
             const tempSheet = tempWorkbook.sheet(0);
 
-            // Apply campaign data to temp sheet
-            await this.applyEnhancedMapping(tempSheet, campaign, templateType);
-
-            // Rename temp sheet to campaign name
+            // Create sanitized sheet name
             const sheetName = campaign.name.substring(0, 31).replace(/[\\\/\?\*\[\]]/g, '_');
-            tempSheet.name(sheetName);
 
-            // Move sheet from temp workbook to main workbook
-            workbook.addSheet(tempSheet);
+            // Add a new blank sheet to the main workbook
+            const newSheet = workbook.addSheet(sheetName);
+
+            // Copy all template content to the new sheet
+            await this.copySheetContents(tempSheet, newSheet);
+
+            // Apply campaign data to the new sheet
+            await this.applyEnhancedMapping(newSheet, campaign, templateType);
         }
 
         // Return the workbook buffer
