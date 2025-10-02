@@ -2,8 +2,10 @@
 // This file should be included in index.html to enable Excel export functionality
 // Supports dynamic row generation with alternating colors and individual template files
 
-// Get export server URL from global config (set by Vite environment variables)
-const EXCEL_EXPORT_SERVER = window.APP_CONFIG?.EXPORT_API || 'http://localhost:3001';
+// Use Vercel serverless function or fallback to localhost for development
+const EXCEL_EXPORT_SERVER = window.location.hostname === 'localhost'
+    ? 'http://localhost:3001'
+    : '';
 
 // Retry helper function with exponential backoff
 async function retryFetch(url, options, maxRetries = 3) {
@@ -35,7 +37,7 @@ async function exportCampaignToExcel(campaign) {
         
         console.log(`Exporting campaign: ${campaign.name} (${campaign.templateType}) with ${campaign.flights.length} flights`);
 
-        const response = await retryFetch(`${EXCEL_EXPORT_SERVER}/api/export/single`, {
+        const response = await retryFetch(`${EXCEL_EXPORT_SERVER}/api/excel-export`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -117,7 +119,7 @@ async function exportCampaignsToExcel(campaigns) {
         console.log(`Exporting ${campaigns.length} campaigns:`);
         campaigns.forEach(c => console.log(`  - ${c.name} (${c.templateType}, ${c.flights.length} flights)`));
 
-        const response = await retryFetch(`${EXCEL_EXPORT_SERVER}/api/export/bulk`, {
+        const response = await retryFetch(`${EXCEL_EXPORT_SERVER}/api/excel-export`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
